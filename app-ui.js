@@ -43,6 +43,14 @@ function render(){
       <div class="section-head">
         <h2>Holdings</h2>
         <div class="actions">
+          ${state.holdings.length>1 ? `<div class="menu">
+            <button class="btn btn-outline" data-act="sort-toggle">${I.sort} Sort</button>
+            ${state.sortOpen ? `<div class="menu-list sort-list">${SORTS.map((s,i)=>{
+              const prev = SORTS[i-1];
+              const head = s.group && s.group !== prev?.group ? `<div class="grp">${esc(s.group)}</div>` : "";
+              return `${head}<button data-sort="${s.id}">${state.sort===s.id?"\u2713 ":""}${esc(s.label)}</button>`;
+            }).join("")}</div>` : ""}
+          </div>` : ""}
           <button class="btn btn-outline" data-act="wallet">${I.wallet} Wallet</button>
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
         </div>
@@ -54,7 +62,7 @@ function render(){
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
           <button class="btn btn-outline" data-act="sample">Use sample stack</button>
         </div>
-      </div>` : `<div class="grid">${state.holdings.map(cardHtml).join("")}</div>`}
+      </div>` : `<div class="grid">${sortedHoldings().map(cardHtml).join("")}</div>`}
     </section>
     <section class="card dca" id="dca">
       ${!hDca ? `<h2>DCA path</h2><p class="lead">Add a target first, then set a date to fill it.</p>` : `
@@ -195,22 +203,24 @@ function dialogHtml(){
 document.getElementById("app").addEventListener("click", (e) => {
   if (e.target.classList.contains("overlay")) { closeDialog(); return; }
   const inside = e.target.closest(".dialog");
-  const t = e.target.closest("[data-act],[data-menu],[data-edit],[data-plan],[data-del],[data-close],[data-freq],[data-pick]");
+  const t = e.target.closest("[data-act],[data-menu],[data-edit],[data-plan],[data-del],[data-close],[data-freq],[data-pick],[data-sort]");
   if (inside && (!t || !inside.contains(t))) return;
   if (t?.hasAttribute("data-close")) { closeDialog(); return; }
-  if (!t) { if (state.menu) { state.menu=null; render(); } return; }
+  if (!t) { if (state.menu || state.sortOpen) { state.menu=null; state.sortOpen=false; render(); } return; }
   if (t.dataset.act==="signin") openSignIn();
   else if (t.dataset.act==="add") openAdd();
   else if (t.dataset.act==="wallet") openWallet();
   else if (t.dataset.act==="sample") { Object.assign(state, makeSample()); persist(); render(); }
   else if (t.dataset.act==="prices") { loadPrices(true); }
+  else if (t.dataset.act==="sort-toggle") { state.sortOpen=!state.sortOpen; state.menu=null; render(); }
+  else if (t.dataset.sort) { state.sort=t.dataset.sort; saveSort(state.sort); state.sortOpen=false; render(); }
   else if (t.dataset.act==="save-plan") savePlan();
   else if (t.dataset.act==="clear-plan") clearPlan(t.dataset.id);
   else if (t.dataset.act==="connect") connectWallet();
   else if (t.dataset.act==="apply-wallet") applyWallet();
   else if (t.dataset.act==="save-holding") saveHolding();
   else if (t.dataset.act==="toggle-custom") { state.dialog.custom=!state.dialog.custom; render(); }
-  else if (t.dataset.menu) { state.menu = state.menu===t.dataset.menu ? null : t.dataset.menu; render(); }
+  else if (t.dataset.menu) { state.menu = state.menu===t.dataset.menu ? null : t.dataset.menu; state.sortOpen=false; render(); }
   else if (t.dataset.edit) { const h=state.holdings.find(x=>x.id===t.dataset.edit); state.menu=null; openAdd(h); }
   else if (t.dataset.plan) { state.dcaId=t.dataset.plan; state.menu=null; render(); document.getElementById("dca")?.scrollIntoView({behavior:"smooth",block:"start"}); }
   else if (t.dataset.del) { removeHolding(t.dataset.del); }
@@ -239,4 +249,4 @@ document.getElementById("app").addEventListener("input", (e) => {
 render();
 loadPrices();
 setInterval(loadPrices, 60000);
-setInterval(() => { if (state.priceAt && !state.dialog && !state.menu) render(); }, 15000);
+setInterval(() => { if (state.priceAt && !state.dialog && !state.menu && !state.sortOpen) render(); }, 15000);
