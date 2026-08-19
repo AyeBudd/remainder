@@ -1,26 +1,5 @@
-const ASSETS = [
-  { symbol:"BTC", name:"Bitcoin", id:"bitcoin", decimals:8, pair:"BTC-USD" },
-  { symbol:"ETH", name:"Ethereum", id:"ethereum", decimals:6, pair:"ETH-USD", eth:"native" },
-  { symbol:"SOL", name:"Solana", id:"solana", decimals:4, pair:"SOL-USD" },
-  { symbol:"BNB", name:"BNB", id:"binancecoin", decimals:4 },
-  { symbol:"XRP", name:"XRP", id:"ripple", decimals:2, pair:"XRP-USD" },
-  { symbol:"ADA", name:"Cardano", id:"cardano", decimals:2, pair:"ADA-USD" },
-  { symbol:"DOGE", name:"Dogecoin", id:"dogecoin", decimals:0, pair:"DOGE-USD" },
-  { symbol:"AVAX", name:"Avalanche", id:"avalanche-2", decimals:3, pair:"AVAX-USD" },
-  { symbol:"LINK", name:"Chainlink", id:"chainlink", decimals:3, pair:"LINK-USD", eth:"0x514910771AF9Ca656af840dff83E8264EcF986CA" },
-  { symbol:"UNI", name:"Uniswap", id:"uniswap", decimals:3, pair:"UNI-USD", eth:"0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984" },
-  { symbol:"AAVE", name:"Aave", id:"aave", decimals:3, pair:"AAVE-USD", eth:"0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9" },
-  { symbol:"SUI", name:"Sui", id:"sui", decimals:2, pair:"SUI-USD" },
-  { symbol:"TON", name:"Toncoin", id:"the-open-network", decimals:2 },
-  { symbol:"ATOM", name:"Cosmos", id:"cosmos", decimals:3, pair:"ATOM-USD" },
-  { symbol:"NEAR", name:"NEAR", id:"near", decimals:2, pair:"NEAR-USD" },
-  { symbol:"APT", name:"Aptos", id:"aptos", decimals:3, pair:"APT-USD" },
-  { symbol:"LTC", name:"Litecoin", id:"litecoin", decimals:4, pair:"LTC-USD" },
-  { symbol:"BCH", name:"Bitcoin Cash", id:"bitcoin-cash", decimals:4, pair:"BCH-USD" },
-  { symbol:"DOT", name:"Polkadot", id:"polkadot", decimals:3, pair:"DOT-USD" },
-  { symbol:"USDC", name:"USD Coin", id:"usd-coin", decimals:2, pair:"USDC-USD", eth:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", dec:6 },
-  { symbol:"USDT", name:"Tether", id:"tether", decimals:2, eth:"0xdAC17F958D2ee523a2206206994597C13D831ec7", dec:6 },
-];
+let ASSETS = BAKED.slice();
+
 const TOKENS = [
   { symbol:"ETH", name:"Ethereum", maps:"ETH", address:"native", decimals:18 },
   { symbol:"WBTC", name:"Wrapped Bitcoin", maps:"BTC", address:"0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals:8 },
@@ -97,21 +76,57 @@ const state = {
 
 function persist(){ save({ holdings: state.holdings, plans: state.plans }); }
 
-async function loadPrices(){
-  const ids = [...new Set(ASSETS.map(a=>a.id))].join(",");
+function applyCatalog(rows){
+  if (!Array.isArray(rows) || rows.length < 50) return false;
+  const seen = new Set();
+  const next = [];
+  const prices = {};
+  for (const row of rows) {
+    const symbol = String(row.symbol || "").toUpperCase();
+    if (!symbol || seen.has(symbol)) continue;
+    seen.add(symbol);
+    const baked = BAKED.find(a => a.symbol === symbol);
+    const id = baked?.id || String(row.nameid || row.id || symbol.toLowerCase());
+    const price = Number(row.price_usd || row.price || row.quotes && row.quotes.USD && row.quotes.USD.price);
+    const dec = baked?.decimals ?? (price >= 1000 ? 6 : price >= 10 ? 4 : price >= 0.1 ? 3 : price >= 0.01 ? 2 : 0);
+    next.push({ symbol, name: row.name || baked?.name || symbol, id, decimals: dec, rank: Number(row.rank) || next.length + 1, pair: baked?.pair });
+    if (price > 0) prices[id] = price;
+  }
+  if (next.length < 50) return false;
+  ASSETS = next;
+  if (Object.keys(prices).length >= 3) { state.prices = prices; state.priceOk = true; }
+  return true;
+}
+
+async function loadCatalog(){
   try {
-    const res = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`);
+    const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=100");
     if (res.ok) {
       const json = await res.json();
-      const prices = {};
-      for (const a of ASSETS) if (json[a.id]?.usd > 0) prices[a.id] = json[a.id].usd;
-      if (Object.keys(prices).length >= 3) { state.prices = prices; state.priceOk = true; render(); return; }
+      if (applyCatalog(json.data || json)) { render(); return; }
+    }
+  } catch {}
+  try {
+    const res = await fetch("https://api.coinpaprika.com/v1/tickers?quotes=USD");
+    if (res.ok) {
+      const rows = (await res.json()).slice().sort((a,b)=>(a.rank||999)-(b.rank||999)).slice(0,100);
+      if (applyCatalog(rows)) { render(); return; }
+    }
+  } catch {}
+}
+
+async function loadPrices(){
+  try {
+    const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=100");
+    if (res.ok) {
+      const json = await res.json();
+      if (applyCatalog(json.data || json) && state.priceOk) { render(); return; }
     }
   } catch {}
   const prices = {};
   await Promise.all(ASSETS.filter(a=>a.pair).map(async a => {
     try {
-      const res = await fetch(`https://api.coinbase.com/v2/prices/${a.pair}/spot`);
+      const res = await fetch("https://api.coinbase.com/v2/prices/"+a.pair+"/spot");
       if (!res.ok) return;
       const n = Number((await res.json()).data?.amount);
       if (n > 0) prices[a.id] = n;
@@ -119,8 +134,7 @@ async function loadPrices(){
   }));
   if (!prices.tether) prices.tether = 1;
   if (!prices["usd-coin"]) prices["usd-coin"] = 1;
-  state.prices = prices;
-  state.priceOk = Object.keys(prices).length >= 3;
+  if (Object.keys(prices).length >= 3) { state.prices = Object.assign({}, state.prices, prices); state.priceOk = true; }
   render();
 }
 
