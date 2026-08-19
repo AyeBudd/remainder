@@ -129,7 +129,7 @@ function cardHtml(h){
 function dialogHtml(){
   const d = state.dialog;
   if (!d) return "";
-  if (d.type==="signin") return `<div class="overlay" data-close="1"><div class="dialog" role="dialog" aria-labelledby="si-title">
+  if (d.type==="signin") return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="si-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="si-title">Sign in</h2>
     <p class="desc">This public GitHub Pages build keeps your ledger in this browser. Google / X account save needs Remainder hosted with a database (the full app in this repo).</p>
@@ -138,7 +138,7 @@ function dialogHtml(){
   if (d.type==="wallet") {
     const w = state.wallet;
     const available = Boolean(getProvider());
-    return `<div class="overlay" data-close="1"><div class="dialog" role="dialog" aria-labelledby="w-title">
+    return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="w-title">
       <button class="x" data-close="1" aria-label="Close">${I.x}</button>
       <h2 id="w-title">Connect a wallet</h2>
       <p class="desc">Read-only. Remainder asks for your address and token balances on Ethereum — never a transaction, never your keys.</p>
@@ -159,7 +159,7 @@ function dialogHtml(){
   const taken = new Set(state.holdings.map(h=>h.symbol));
   const q = (d.query||"").trim().toLowerCase();
   const matches = ASSETS.filter(a => !q || a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.id.includes(q)).slice(0,12);
-  return `<div class="overlay" data-close="1"><div class="dialog" role="dialog" aria-labelledby="a-title">
+  return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="a-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="a-title">${d.edit?`Edit ${esc(d.edit.symbol)}`:"Add a target"}</h2>
     <p class="desc">Set how much you want to hold. Current amount can be typed in or filled from a wallet later.</p>
@@ -188,9 +188,11 @@ function dialogHtml(){
 }
 
 document.getElementById("app").addEventListener("click", (e) => {
+  if (e.target.classList.contains("overlay")) { closeDialog(); return; }
+  const inside = e.target.closest(".dialog");
   const t = e.target.closest("[data-act],[data-menu],[data-edit],[data-plan],[data-del],[data-close],[data-freq],[data-pick]");
-  if (e.target.closest(".dialog") && !t) return;
-  if (e.target.classList.contains("overlay") || t?.hasAttribute("data-close")) { closeDialog(); return; }
+  if (inside && (!t || !inside.contains(t))) return;
+  if (t?.hasAttribute("data-close")) { closeDialog(); return; }
   if (!t) { if (state.menu) { state.menu=null; render(); } return; }
   if (t.dataset.act==="signin") openSignIn();
   else if (t.dataset.act==="add") openAdd();
