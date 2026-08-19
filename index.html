@@ -168,6 +168,9 @@
       border: 0; border-radius: 0.5rem; background: none; color: var(--muted);
     }
     .x:hover { background: var(--secondary); color: var(--fg); }
+    .price-row { margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
+    .spin { animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; max-height: 14.5rem; overflow: auto; }
     @media (min-width: 640px) { .asset-grid { grid-template-columns: 1fr 1fr 1fr; } }
     .asset {
@@ -194,9 +197,9 @@
 </head>
 <body>
   <div id="app"></div>
-  <script src="./app-catalog.js?v=3"></script>
-  <script src="./app-core.js?v=3"></script>
-  <script src="./app-ui.js?v=3"></script>
+  <script src="./app-catalog.js?v=4"></script>
+  <script src="./app-core.js?v=4"></script>
+  <script src="./app-ui.js?v=4"></script>
 
 </body>
 </html>
