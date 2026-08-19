@@ -1,5 +1,6 @@
 let ASSETS = BAKED.slice();
 
+
 const TOKENS = [
   { symbol:"ETH", name:"Ethereum", maps:"ETH", address:"native", decimals:18 },
   { symbol:"WBTC", name:"Wrapped Bitcoin", maps:"BTC", address:"0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals:8 },
@@ -16,6 +17,7 @@ const I = {
   wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/><path d="M3 9h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="13" r="1"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
   route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>',
+  refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
 };
 
@@ -34,6 +36,15 @@ function formatCoins(n, sym){
   if (!Number.isFinite(n)) return "—";
   const d = assetOf(sym)?.decimals ?? 4;
   return new Intl.NumberFormat("en-US",{maximumFractionDigits:d}).format(n);
+}
+function formatUpdated(at){
+  if (!at) return "not yet";
+  const sec = Math.max(0, Math.round((Date.now()-at)/1000));
+  if (sec < 15) return "just now";
+  if (sec < 60) return sec+"s ago";
+  const min = Math.round(sec/60);
+  if (min < 60) return min+"m ago";
+  return new Date(at).toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
 }
 function formatPct(r){ if (!Number.isFinite(r)) return "—"; const p=r*100; return `${p.toFixed(p>=10?0:1)}%`; }
 function remain(c,t){ return Math.max(0, t-c); }
@@ -67,6 +78,8 @@ const state = {
   ...load(),
   prices: {},
   priceOk: false,
+  priceAt: 0,
+  priceBusy: false,
   menu: null,
   dialog: null,
   dcaId: null,
@@ -94,7 +107,7 @@ function applyCatalog(rows){
   }
   if (next.length < 50) return false;
   ASSETS = next;
-  if (Object.keys(prices).length >= 3) { state.prices = prices; state.priceOk = true; }
+  if (Object.keys(prices).length >= 3) { state.prices = prices; state.priceOk = true; state.priceAt = Date.now(); }
   return true;
 }
 
@@ -115,27 +128,39 @@ async function loadCatalog(){
   } catch {}
 }
 
-async function loadPrices(){
+async function loadPrices(force){
+  if (state.priceBusy) return;
+  state.priceBusy = true;
+  if (force) render();
+  const bust = force ? "&t="+Date.now() : "";
   try {
-    const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=100");
-    if (res.ok) {
-      const json = await res.json();
-      if (applyCatalog(json.data || json) && state.priceOk) { render(); return; }
-    }
-  } catch {}
-  const prices = {};
-  await Promise.all(ASSETS.filter(a=>a.pair).map(async a => {
     try {
-      const res = await fetch("https://api.coinbase.com/v2/prices/"+a.pair+"/spot");
-      if (!res.ok) return;
-      const n = Number((await res.json()).data?.amount);
-      if (n > 0) prices[a.id] = n;
+      const res = await fetch("https://api.coinlore.net/api/tickers/?start=0&limit=100"+bust);
+      if (res.ok) {
+        const json = await res.json();
+        if (applyCatalog(json.data || json) && state.priceOk) return;
+      }
     } catch {}
-  }));
-  if (!prices.tether) prices.tether = 1;
-  if (!prices["usd-coin"]) prices["usd-coin"] = 1;
-  if (Object.keys(prices).length >= 3) { state.prices = Object.assign({}, state.prices, prices); state.priceOk = true; }
-  render();
+    const prices = {};
+    await Promise.all(ASSETS.filter(a=>a.pair).map(async a => {
+      try {
+        const res = await fetch("https://api.coinbase.com/v2/prices/"+a.pair+"/spot");
+        if (!res.ok) return;
+        const n = Number((await res.json()).data?.amount);
+        if (n > 0) prices[a.id] = n;
+      } catch {}
+    }));
+    if (!prices.tether) prices.tether = 1;
+    if (!prices["usd-coin"]) prices["usd-coin"] = 1;
+    if (Object.keys(prices).length >= 3) {
+      state.prices = Object.assign({}, state.prices, prices);
+      state.priceOk = true;
+      state.priceAt = Date.now();
+    }
+  } finally {
+    state.priceBusy = false;
+    render();
+  }
 }
 
 function addMonths(d,n){ const x=new Date(d); x.setMonth(x.getMonth()+n); return x; }
