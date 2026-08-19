@@ -34,6 +34,10 @@ function render(){
         <div class="slices">${t.slices.map(s=>`<span>${esc(s.symbol)} ${esc(formatUsd(s.remainUsd,{compact:true}))}</span>`).join("")}</div>
       </div>` : ""}
       ${!state.priceOk ? `<p class="held" style="margin-top:12px">Live prices are unavailable. Coin amounts and remaining units still update.</p>` : ""}
+      <div class="price-row">
+        <p class="held">${state.priceBusy && !state.priceAt ? "Fetching live prices…" : state.priceAt ? "Prices updated "+esc(formatUpdated(state.priceAt))+" · auto every minute" : "Prices pending"}</p>
+        <button class="btn btn-outline" data-act="prices" ${state.priceBusy?"disabled":""}><span class="${state.priceBusy?"spin":""}" style="display:inline-flex">${I.refresh}</span> ${state.priceBusy?"Updating…":"Update prices"}</button>
+      </div>
     </section>
     <section class="section">
       <div class="section-head">
@@ -199,6 +203,7 @@ document.getElementById("app").addEventListener("click", (e) => {
   else if (t.dataset.act==="add") openAdd();
   else if (t.dataset.act==="wallet") openWallet();
   else if (t.dataset.act==="sample") { Object.assign(state, makeSample()); persist(); render(); }
+  else if (t.dataset.act==="prices") { loadPrices(true); }
   else if (t.dataset.act==="save-plan") savePlan();
   else if (t.dataset.act==="clear-plan") clearPlan(t.dataset.id);
   else if (t.dataset.act==="connect") connectWallet();
@@ -234,3 +239,4 @@ document.getElementById("app").addEventListener("input", (e) => {
 render();
 loadPrices();
 setInterval(loadPrices, 60000);
+setInterval(() => { if (state.priceAt && !state.dialog && !state.menu) render(); }, 15000);
