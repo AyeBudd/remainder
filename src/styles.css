@@ -1,0 +1,81 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-background: #0c0d0c;
+  --color-foreground: #f0efe8;
+  --color-card: #141514;
+  --color-card-foreground: #f0efe8;
+  --color-popover: #181918;
+  --color-popover-foreground: #f0efe8;
+  --color-primary: #d8dad4;
+  --color-primary-foreground: #0c0d0c;
+  --color-secondary: #1c1d1c;
+  --color-secondary-foreground: #f0efe8;
+  --color-muted: #1a1b1a;
+  --color-muted-foreground: #8e8d86;
+  --color-accent: #222322;
+  --color-accent-foreground: #f0efe8;
+  --color-destructive: #c45c4a;
+  --color-destructive-foreground: #f0efe8;
+  --color-border: rgb(240 239 232 / 0.1);
+  --color-input: rgb(240 239 232 / 0.12);
+  --color-ring: #d8dad4;
+  --color-success: #7d9a78;
+  --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Instrument Serif", "Times New Roman", serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.25rem;
+  --radius: 0.75rem;
+  --shadow-border: 0 0 0 1px rgb(240 239 232 / 0.08);
+  --shadow-border-hover: 0 0 0 1px rgb(240 239 232 / 0.14);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+  }
+
+  body {
+    min-height: 100dvh;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
