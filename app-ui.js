@@ -158,17 +158,18 @@ function dialogHtml(){
   }
   const taken = new Set(state.holdings.map(h=>h.symbol));
   const q = (d.query||"").trim().toLowerCase();
-  const matches = ASSETS.filter(a => !q || a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.id.includes(q)).slice(0,12);
+  const matches = ASSETS.filter(a => !q || a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.id.includes(q));
+  const shown = q ? matches.slice(0,40) : matches;
   return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="a-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="a-title">${d.edit?`Edit ${esc(d.edit.symbol)}`:"Add a target"}</h2>
-    <p class="desc">Set how much you want to hold. Current amount can be typed in or filled from a wallet later.</p>
+    <p class="desc">Pick from the current top 100 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.</p>
     ${!d.edit?`<div style="margin-top:1rem">
-      <label class="lbl" for="asset-search">Asset</label>
-      ${!d.custom?`<input id="asset-search" value="${esc(d.query||"")}" placeholder="Search Bitcoin, ETH, SOL…" autocomplete="off" />
-      <div class="asset-grid" style="margin-top:8px">${matches.map(a=>{
+      <label class="lbl" for="asset-search">Top 100 assets</label>
+      ${!d.custom?`<input id="asset-search" value="${esc(d.query||"")}" placeholder="Search Bitcoin, HYPE, PENGU…" autocomplete="off" />
+      <div class="asset-grid" style="margin-top:8px">${shown.map(a=>{
         const on = d.asset?.symbol===a.symbol;
-        return `<button type="button" class="asset ${on?"on":""}" data-pick="${a.symbol}" ${taken.has(a.symbol)?"disabled":""}><b>${esc(a.symbol)}</b><small>${taken.has(a.symbol)?"Added":esc(a.name)}</small></button>`;
+        return `<button type="button" class="asset ${on?"on":""}" data-pick="${a.symbol}" ${taken.has(a.symbol)?"disabled":""}><b>${esc(a.symbol)}</b>${a.rank?`<span class="rank">#${a.rank}</span>`:""}<small>${taken.has(a.symbol)?"Added":esc(a.name)}</small></button>`;
       }).join("")}</div>`:`<div class="fields">
         <div><label class="lbl" for="csym">Symbol</label><input id="csym" value="${esc(d.csym)}" placeholder="HYPE"/></div>
         <div><label class="lbl" for="cid">CoinGecko id</label><input id="cid" value="${esc(d.cid)}" placeholder="hyperliquid"/></div>
