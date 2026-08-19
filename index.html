@@ -168,12 +168,15 @@
       border: 0; border-radius: 0.5rem; background: none; color: var(--muted);
     }
     .x:hover { background: var(--secondary); color: var(--fg); }
-    .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; max-height: 11rem; overflow: auto; }
+    .asset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.25rem; max-height: 14.5rem; overflow: auto; }
     @media (min-width: 640px) { .asset-grid { grid-template-columns: 1fr 1fr 1fr; } }
     .asset {
+      position: relative;
       border: 0; border-radius: 0.375rem; padding: 0.5rem; text-align: left;
       background: var(--secondary); color: var(--fg);
     }
+    .asset .rank { position: absolute; top: 0.4rem; right: 0.45rem; font-size: 0.625rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .asset.on .rank { color: rgb(12 13 12 / 0.55); }
     .asset.on { background: var(--primary); color: var(--primary-fg); }
     .asset:disabled { opacity: 0.35; }
     .asset small { display: block; font-size: 0.75rem; color: var(--muted); }
@@ -191,7 +194,9 @@
 </head>
 <body>
   <div id="app"></div>
-  <script src="./app-core.js"></script>
-  <script src="./app-ui.js?v=2"></script>
+  <script src="./app-catalog.js?v=3"></script>
+  <script src="./app-core.js?v=3"></script>
+  <script src="./app-ui.js?v=3"></script>
+
 </body>
 </html>
