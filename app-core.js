@@ -18,6 +18,7 @@ const I = {
   more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
   route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
+  sort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
 };
 
@@ -74,12 +75,33 @@ function load(){
 }
 function save(state){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} }
 
+const SORT_KEY = "remainder.sort";
+const SORTS = [
+  { id:"added", label:"Added order", group:"" },
+  { id:"held-desc", label:"High to low", group:"Current value" },
+  { id:"held-asc", label:"Low to high", group:"Current value" },
+  { id:"pct-desc", label:"High to low", group:"% of target" },
+  { id:"pct-asc", label:"Low to high", group:"% of target" },
+  { id:"target-desc", label:"High to low", group:"Target value" },
+  { id:"target-asc", label:"Low to high", group:"Target value" },
+];
+function loadSort(){
+  try {
+    const raw = localStorage.getItem(SORT_KEY);
+    if (SORTS.some(s => s.id===raw)) return raw;
+  } catch {}
+  return "added";
+}
+function saveSort(id){ try { localStorage.setItem(SORT_KEY, id); } catch {} }
+
 const state = {
   ...load(),
   prices: {},
   priceOk: false,
   priceAt: 0,
   priceBusy: false,
+  sort: loadSort(),
+  sortOpen: false,
   menu: null,
   dialog: null,
   dcaId: null,
@@ -88,6 +110,24 @@ const state = {
 };
 
 function persist(){ save({ holdings: state.holdings, plans: state.plans }); }
+function metricOf(h, kind){
+  if (kind==="pct") return h.target>0 ? h.current/h.target : (h.current>0?1:0);
+  const p = state.prices[h.idg];
+  if (p==null || !Number.isFinite(p)) return 0;
+  return (kind==="held" ? h.current : h.target) * p;
+}
+function sortedHoldings(){
+  const list = state.holdings;
+  const sort = state.sort || "added";
+  if (sort==="added" || list.length<2) return list;
+  const dir = sort.endsWith("desc") ? -1 : 1;
+  const kind = sort.startsWith("held") ? "held" : sort.startsWith("pct") ? "pct" : "target";
+  return list.slice().sort((a,b) => {
+    const va = metricOf(a, kind), vb = metricOf(b, kind);
+    if (va===vb) return String(a.symbol).localeCompare(b.symbol);
+    return (va-vb)*dir;
+  });
+}
 
 function applyCatalog(rows){
   if (!Array.isArray(rows) || rows.length < 50) return false;
