@@ -44,6 +44,13 @@ export function formatPercent(ratio: number): string {
   return `${pct.toFixed(digits)}%`;
 }
 
+export function formatSignedPercent(ratio: number): string {
+  if (!Number.isFinite(ratio)) return "—";
+  const pct = ratio * 100;
+  const digits = Math.abs(pct) >= 10 ? 0 : 1;
+  return `${pct > 0 ? "+" : ""}${pct.toFixed(digits)}%`;
+}
+
 export function formatAddress(address: string): string {
   if (address.length < 12) return address;
   return `${address.slice(0, 6)}…${address.slice(-4)}`;

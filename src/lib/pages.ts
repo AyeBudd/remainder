@@ -9,4 +9,9 @@ export const APP_PAGES = [
     label: "What if?",
     hint: "Your prices. Both bags. All at once.",
   },
+  {
+    id: "btc" as const,
+    label: "BTC tracker",
+    hint: "Price, halving, ATH, cycle low",
+  },
 ];

@@ -100,8 +100,9 @@ const VIEW_KEY = "remainder.view";
 function pageFromHash(){
   try {
     const h = String(location.hash || "").replace(/^#\/?/, "");
-    if (h === "what-if") return "what-if";
-    if (localStorage.getItem(VIEW_KEY) === "what-if") return "what-if";
+    if (h === "what-if" || h === "btc") return h;
+    const stored = localStorage.getItem(VIEW_KEY);
+    if (stored === "what-if" || stored === "btc") return stored;
   } catch {}
   return "ledger";
 }
@@ -122,13 +123,120 @@ function loadWhatIf(){
 }
 function saveWhatIf(){ try { localStorage.setItem(WHAT_IF_KEY, JSON.stringify(state.whatIf)); } catch {} }
 function goPage(id){
-  state.page = id === "what-if" ? "what-if" : "ledger";
+  state.page = (id === "what-if" || id === "btc") ? id : "ledger";
   state.navOpen = false;
   try { localStorage.setItem(VIEW_KEY, state.page); } catch {}
-  const next = state.page === "what-if" ? "#/what-if" : "#/";
+  const next = state.page === "ledger" ? "#/" : "#/"+state.page;
   if (location.hash !== next) history.replaceState(null, "", next);
+  if (state.page === "btc") loadBtcTracker(false);
   render();
 }
+
+const LAST_HALVING_AT = Date.UTC(2024, 3, 20, 0, 9);
+const LAST_HALVING_BLOCK = 840000;
+const NEXT_HALVING_BLOCK = 1050000;
+const BAKED_ATH = { price: 126173.18, at: Date.parse("2025-10-06T19:00:40Z") };
+const BAKED_CYCLE_LOW = { price: 59013.39, at: Date.parse("2026-06-30T00:00:00Z") };
+
+function formatDays(n){
+  if (!Number.isFinite(n)) return "—";
+  const d = Math.round(n);
+  return new Intl.NumberFormat("en-US").format(d) + " day" + (d===1?"":"s");
+}
+function formatShortDate(at){
+  if (!at) return "—";
+  return new Date(at).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"});
+}
+function formatSignedPct(r){
+  if (!Number.isFinite(r)) return "—";
+  const p = r*100;
+  return (p>0?"+":"") + p.toFixed(Math.abs(p)>=10?0:1) + "%";
+}
+function cycleFromHeight(height){
+  const now = Date.now();
+  const tip = height > LAST_HALVING_BLOCK ? height : LAST_HALVING_BLOCK + Math.floor((now-LAST_HALVING_AT)/600000);
+  const mined = Math.max(1, tip - LAST_HALVING_BLOCK);
+  const avgMs = (now - LAST_HALVING_AT) / mined;
+  const left = Math.max(0, NEXT_HALVING_BLOCK - tip);
+  const eta = now + left * avgMs;
+  return {
+    height: height > 0 ? height : null,
+    daysSince: Math.max(0, Math.floor((now-LAST_HALVING_AT)/86400000)),
+    daysTo: Math.max(0, Math.ceil((eta-now)/86400000)),
+    lastAt: LAST_HALVING_AT,
+    eta,
+    progress: Math.min(1, mined/210000),
+    blocksLeft: height > 0 ? left : null,
+  };
+}
+async function fetchText(url){
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(String(res.status));
+  return res.text();
+}
+async function loadBtcTracker(force){
+  if (state.btcBusy) return;
+  if (!force && state.btc && Date.now()-state.btc.updatedAt < 60000) return;
+  state.btcBusy = true;
+  if (force) render();
+  try {
+    let price = state.prices.bitcoin || null;
+    let ath = BAKED_ATH;
+    try {
+      const res = await fetch("https://api.coinpaprika.com/v1/tickers/btc-bitcoin");
+      if (res.ok) {
+        const usd = (await res.json()).quotes?.USD || {};
+        if (Number(usd.price) > 0) price = Number(usd.price);
+        if (Number(usd.ath_price) > 0) {
+          const at = Date.parse(usd.ath_date);
+          ath = { price: Number(usd.ath_price), at: Number.isFinite(at) ? at : BAKED_ATH.at };
+        }
+      }
+    } catch {}
+    if (price == null) {
+      try {
+        const res = await fetch("https://api.coinbase.com/v2/prices/BTC-USD/spot");
+        if (res.ok) {
+          const n = Number((await res.json()).data?.amount);
+          if (n > 0) price = n;
+        }
+      } catch {}
+    }
+    let cycleLow = BAKED_CYCLE_LOW;
+    try {
+      const start = new Date(ath.at).toISOString().slice(0,10);
+      const res = await fetch("https://api.coinpaprika.com/v1/tickers/btc-bitcoin/historical?start="+start+"&interval=1d");
+      if (res.ok) {
+        const rows = await res.json();
+        if (Array.isArray(rows)) {
+          let best = null;
+          for (const row of rows) {
+            const p = Number(row.price);
+            const at = Date.parse(row.timestamp);
+            if (p>0 && Number.isFinite(at) && (!best || p < best.price)) best = { price:p, at };
+          }
+          if (best) cycleLow = best;
+        }
+      }
+    } catch {}
+    let height = null;
+    for (const url of ["https://blockchain.info/q/getblockcount","https://mempool.space/api/blocks/tip/height"]) {
+      try {
+        const n = Number((await fetchText(url)).trim());
+        if (n > 800000) { height = n; break; }
+      } catch {}
+    }
+    state.btc = { price, ath, cycleLow, cycle: cycleFromHeight(height), updatedAt: Date.now() };
+  } catch {
+    if (!state.btc) {
+      state.btc = { price: state.prices.bitcoin || null, ath: BAKED_ATH, cycleLow: BAKED_CYCLE_LOW, cycle: cycleFromHeight(null), updatedAt: Date.now() };
+    }
+  } finally {
+    state.btcBusy = false;
+    render();
+  }
+}
+
 function yoursPrice(h){
   const c = state.whatIf[h.idg];
   if (c > 0) return c;
@@ -177,6 +285,8 @@ const state = {
   navOpen: false,
   whatIf: loadWhatIf(),
   whatIfDraft: {},
+  btc: null,
+  btcBusy: false,
   menu: null,
   dialog: null,
   dcaId: null,

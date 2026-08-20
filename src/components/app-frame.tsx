@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { BtcTrackerPage } from "@/components/btc-tracker-page";
 import { Dashboard } from "@/components/dashboard";
 import { SiteHeader } from "@/components/site-header";
 import { WhatIfPage } from "@/components/what-if-page";
@@ -24,7 +25,13 @@ export function AppFrame() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
       <SiteHeader view={view} onViewChange={choose} />
-      {view === "what-if" ? <WhatIfPage onBack={() => choose("ledger")} /> : <Dashboard />}
+      {view === "what-if" ? (
+        <WhatIfPage onBack={() => choose("ledger")} />
+      ) : view === "btc" ? (
+        <BtcTrackerPage />
+      ) : (
+        <Dashboard />
+      )}
     </div>
   );
 }

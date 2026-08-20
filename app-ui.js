@@ -27,6 +27,9 @@ function navHtml(){
         <button type="button" class="nav-item ${state.page==="what-if"?"on":""}" data-act="page" data-page="what-if">
           <b>What if?</b><small>Your prices. Both bags. All at once.</small>
         </button>
+        <button type="button" class="nav-item ${state.page==="btc"?"on":""}" data-act="page" data-page="btc">
+          <b>BTC tracker</b><small>Price, halving, ATH, cycle low</small>
+        </button>
       </nav>
     </aside>
   </div>`;
@@ -41,6 +44,10 @@ function render(){
       state.form = { date: plan?.targetDate || sampleDate(), freq: plan?.frequency || "weekly", assumed: plan?.assumed!=null?String(plan.assumed):"", err:null, _for:hDca.id };
     }
     root.innerHTML = `<div class="wrap">${headerHtml()}${whatIfHtml()}</div>${navHtml()}${dialogHtml()}`;
+    return;
+  }
+  if (state.page === "btc") {
+    root.innerHTML = `<div class="wrap">${headerHtml()}${btcHtml()}</div>${navHtml()}${dialogHtml()}`;
     return;
   }
 
@@ -166,6 +173,58 @@ function whatIfHtml(){
         <div class="actions"><button class="btn btn-primary" data-act="page" data-page="ledger">Back to ledger</button></div>
       </div>` : `<div class="grid">${state.holdings.map(whatIfCardHtml).join("")}</div>`}
     </section>`;
+}
+
+function btcHtml(){
+  const b = state.btc;
+  const price = b?.price ?? state.prices.bitcoin ?? null;
+  const fromAth = price != null && b ? price / b.ath.price - 1 : null;
+  const fromLow = price != null && b ? price / b.cycleLow.price - 1 : null;
+  if (!b && state.btcBusy) {
+    return `<section class="hero"><p class="kicker">Bitcoin</p><p class="held" style="margin-top:12px">Fetching live stats…</p></section>`;
+  }
+  const c = b?.cycle;
+  return `
+    <section class="hero">
+      <p class="kicker">Bitcoin</p>
+      <div class="hero-row">
+        <h1>${price!=null ? esc(formatUsd(price)) : "—"}</h1>
+        <p class="fill">${fromAth!=null ? esc(formatSignedPct(fromAth))+" vs ATH" : "spot"}</p>
+      </div>
+      <div class="price-row">
+        <p class="held">${b?.updatedAt ? "Updated "+esc(formatUpdated(b.updatedAt)) : "Fetching…"}</p>
+        <button class="btn btn-outline" data-act="btc-refresh" ${state.btcBusy?"disabled":""}><span class="${state.btcBusy?"spin":""}" style="display:inline-flex">${I.refresh}</span> ${state.btcBusy?"Updating…":"Update"}</button>
+      </div>
+    </section>
+    <section class="grid" style="margin-top:2.5rem">
+      <article class="card">
+        <p class="stat-label">All-time high</p>
+        <p class="remain-val">${b ? esc(formatUsd(b.ath.price)) : "—"}</p>
+        <p class="held">${b ? esc(formatShortDate(b.ath.at)) : ""}</p>
+        ${fromAth!=null?`<p class="amt">${esc(formatSignedPct(fromAth))}</p>`:""}
+      </article>
+      <article class="card">
+        <p class="stat-label">Cycle low</p>
+        <p class="remain-val">${b ? esc(formatUsd(b.cycleLow.price)) : "—"}</p>
+        <p class="held">${b ? esc(formatShortDate(b.cycleLow.at)) : ""}</p>
+        ${fromLow!=null?`<p class="amt">${esc(formatSignedPct(fromLow))} off the floor</p>`:""}
+      </article>
+    </section>
+    ${c ? `<section class="card" style="margin-top:0.75rem">
+      <p class="stat-label">Halving</p>
+      <div class="wif-pair" style="margin-top:0.75rem">
+        <div>
+          <p class="remain-val">${esc(formatDays(c.daysSince))}</p>
+          <p class="held">since ${esc(formatShortDate(c.lastAt))}</p>
+        </div>
+        <div>
+          <p class="remain-val">${esc(formatDays(c.daysTo))}</p>
+          <p class="held">to ~${esc(formatShortDate(c.eta))}</p>
+        </div>
+      </div>
+      <div class="progress" style="margin-top:1.25rem" role="progressbar" aria-valuenow="${Math.round(c.progress*100)}"><div style="width:${Math.max(4,c.progress*100)}%"></div></div>
+      <p class="held">${c.height!=null ? "Block "+esc(c.height.toLocaleString("en-US"))+" · "+esc((c.blocksLeft??0).toLocaleString("en-US"))+" to subsidy cut" : Math.round(c.progress*100)+"% through this epoch"}</p>
+    </section>` : ""}`;
 }
 
 function whatIfCardHtml(h){
@@ -358,6 +417,7 @@ document.getElementById("app").addEventListener("click", (e) => {
     saveWhatIf();
     render();
   }
+  else if (t.dataset.act==="btc-refresh") { loadBtcTracker(true); }
   else if (t.dataset.act==="add") openAdd();
   else if (t.dataset.act==="wallet") openWallet();
   else if (t.dataset.act==="sample") { Object.assign(state, makeSample()); persist(); render(); }
@@ -407,7 +467,12 @@ document.getElementById("app").addEventListener("input", (e) => {
 });
 window.addEventListener("hashchange", () => {
   const next = pageFromHash();
-  if (next !== state.page) { state.page = next; state.navOpen = false; render(); }
+  if (next !== state.page) {
+    state.page = next;
+    state.navOpen = false;
+    if (state.page === "btc") loadBtcTracker(false);
+    render();
+  }
 });
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.navOpen) { state.navOpen = false; render(); }
@@ -415,7 +480,9 @@ window.addEventListener("keydown", (e) => {
 
 render();
 loadPrices();
+if (state.page === "btc") loadBtcTracker(false);
 setInterval(loadPrices, 60000);
+setInterval(() => { if (state.page === "btc") loadBtcTracker(false); }, 60000);
 setInterval(() => {
   if (state.priceAt && !state.dialog && !state.menu && !state.sortOpen && !state.navOpen) {
     if (state.page === "what-if" && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.wif) return;
