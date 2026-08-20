@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
-function oauthHost(): boolean {
+function grokPreviewHost(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname;
   return (
@@ -25,10 +25,10 @@ function Login() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showOauth, setShowOauth] = useState(false);
+  const [useBroker, setUseBroker] = useState(false);
 
   useEffect(() => {
-    setShowOauth(oauthHost());
+    setUseBroker(grokPreviewHost());
   }, []);
 
   const submit = async (e: FormEvent) => {
@@ -61,6 +61,20 @@ function Login() {
     }
   };
 
+  const social = async (idp: string) => {
+    setError(null);
+    if (useBroker) {
+      await signIn(idp === "google" ? "grok-google" : "grok-x", { callbackURL: "/" });
+      return;
+    }
+    const provider = idp === "google" ? "google" : "twitter";
+    const { error: err } = await authClient.signIn.social({
+      provider,
+      callbackURL: "/",
+    });
+    if (err) setError(err.message || "Could not start sign-in. Add Google/X keys in Vercel env.");
+  };
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
       <Link to="/" className="font-serif text-2xl tracking-tight">
@@ -70,12 +84,32 @@ function Login() {
         {mode === "up" ? "Create account" : "Sign in"}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Email saves this stack to your account. Wallet reads stay in the browser.
+        Save this stack to your account. Wallet reads stay in the browser.
       </p>
 
       {authEnabled ? (
         <>
-          <form className="mt-8 space-y-3" onSubmit={(e) => void submit(e)}>
+          <div className="mt-8 space-y-3">
+            {GROK_PROVIDERS.map((p) => (
+              <Button
+                key={p.providerId}
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => void social(p.idp).catch((err) => setError(String(err.message ?? err)))}
+              >
+                Continue with {p.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="mt-8 flex items-center gap-3 text-xs tracking-wide text-muted-foreground uppercase">
+            <span className="h-px flex-1 bg-border" />
+            or email
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
+          <form className="mt-6 space-y-3" onSubmit={(e) => void submit(e)}>
             {mode === "up" && (
               <div className="space-y-1.5">
                 <Label htmlFor="name">Name</Label>
@@ -130,29 +164,6 @@ function Login() {
               {mode === "up" ? "Sign in" : "Create one"}
             </button>
           </p>
-
-          {showOauth && (
-            <>
-              <div className="mt-8 flex items-center gap-3 text-xs tracking-wide text-muted-foreground uppercase">
-                <span className="h-px flex-1 bg-border" />
-                or
-                <span className="h-px flex-1 bg-border" />
-              </div>
-              <div className="mt-6 space-y-3">
-                {GROK_PROVIDERS.map((p) => (
-                  <Button
-                    key={p.providerId}
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => signIn(p.providerId, { callbackURL: "/" })}
-                  >
-                    Continue with {p.label}
-                  </Button>
-                ))}
-              </div>
-            </>
-          )}
         </>
       ) : (
         <p className="mt-8 text-sm text-muted-foreground">Sign-in is disabled.</p>
