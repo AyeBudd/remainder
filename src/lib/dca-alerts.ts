@@ -94,8 +94,10 @@ export async function runDcaAlerts(): Promise<{ checked: number; mailed: number;
       coingeckoId: row.coingecko_id,
       targetAmount: num(row.target_amount),
       currentAmount: num(row.current_amount),
-      source: row.source === "wallet" ? "wallet" : "manual",
+      source: row.source === "wallet" ? "wallet" : row.source === "mixed" ? "mixed" : "manual",
       walletAddress: row.wallet_address,
+      walletAmount: 0,
+      manualAmount: num(row.current_amount),
     }));
     const plans: DcaPlan[] = planRows.map((row) => ({
       id: String(row.id),

@@ -20,6 +20,8 @@ type HoldingRow = {
   current_amount: string | number;
   source: string;
   wallet_address: string | null;
+  wallet_amount?: string | number | null;
+  manual_amount?: string | number | null;
 };
 
 type PlanRow = {
@@ -31,16 +33,32 @@ type PlanRow = {
   baseline?: unknown;
 };
 
+function sourceOf(walletAmount: number, manualAmount: number): HoldingSource {
+  if (walletAmount > 0 && manualAmount > 0) return "mixed";
+  if (walletAmount > 0) return "wallet";
+  return "manual";
+}
+
 function toHolding(row: HoldingRow): Holding {
+  const currentAmount = num(row.current_amount);
+  const walletAmount = num(row.wallet_amount);
+  const manualAmount =
+    row.manual_amount == null
+      ? row.source === "wallet"
+        ? 0
+        : currentAmount
+      : num(row.manual_amount);
   return {
     id: String(row.id),
     symbol: row.symbol,
     name: row.name,
     coingeckoId: row.coingecko_id,
     targetAmount: num(row.target_amount),
-    currentAmount: num(row.current_amount),
-    source: row.source === "wallet" ? "wallet" : "manual",
+    currentAmount,
+    source: sourceOf(walletAmount, manualAmount),
     walletAddress: row.wallet_address,
+    walletAmount,
+    manualAmount,
   };
 }
 
@@ -107,16 +125,20 @@ const holdingInput = z.object({
   coingeckoId: z.string().min(1).max(80),
   targetAmount: z.number().positive(),
   currentAmount: z.number().min(0),
-  source: z.enum(["manual", "wallet"]),
+  source: z.enum(["manual", "wallet", "mixed"]),
   walletAddress: z.string().nullable().optional(),
+  walletAmount: z.number().min(0).optional(),
+  manualAmount: z.number().min(0).optional(),
 });
 
 const holdingPatch = z.object({
   id: z.string().min(1),
   targetAmount: z.number().positive().optional(),
   currentAmount: z.number().min(0).optional(),
-  source: z.enum(["manual", "wallet"]).optional(),
+  source: z.enum(["manual", "wallet", "mixed"]).optional(),
   walletAddress: z.string().nullable().optional(),
+  walletAmount: z.number().min(0).optional(),
+  manualAmount: z.number().min(0).optional(),
 });
 
 const planInput = z.object({
@@ -136,7 +158,7 @@ export const listHoldings = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     const rows = await sql<HoldingRow>`
-      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address
+      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
       from holdings
       where user_id = ${context.userId}
       order by id asc
@@ -161,8 +183,11 @@ export const createHolding = createServerFn({ method: "POST" })
   .validator((input: unknown) => holdingInput.parse(input))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
+    const walletAmount = data.walletAmount ?? (data.source === "wallet" || data.source === "mixed" ? data.currentAmount : 0);
+    const manualAmount = data.manualAmount ?? Math.max(0, data.currentAmount - walletAmount);
+    const source = sourceOf(walletAmount, manualAmount);
     const rows = await sql<HoldingRow>`
-      insert into holdings (user_id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address)
+      insert into holdings (user_id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount)
       values (
         ${context.userId},
         ${data.symbol.toUpperCase()},
@@ -170,10 +195,12 @@ export const createHolding = createServerFn({ method: "POST" })
         ${data.coingeckoId},
         ${data.targetAmount},
         ${data.currentAmount},
-        ${data.source},
-        ${data.walletAddress ?? null}
+        ${source},
+        ${data.walletAddress ?? null},
+        ${walletAmount},
+        ${manualAmount}
       )
-      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address
+      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
     `;
     const created = rows[0];
     if (!created) throw new Error("Failed to create holding");
@@ -187,15 +214,25 @@ export const updateHolding = createServerFn({ method: "POST" })
     const sql = await getSql();
     const id = Number(data.id);
     const existing = await sql<HoldingRow>`
-      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address
+      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
       from holdings
       where id = ${id} and user_id = ${context.userId}
     `;
     const row = existing[0];
     if (!row) throw new Error("Holding not found");
-    const targetAmount = data.targetAmount ?? num(row.target_amount);
-    const currentAmount = data.currentAmount ?? num(row.current_amount);
-    const source: HoldingSource = data.source ?? (row.source === "wallet" ? "wallet" : "manual");
+    const prev = toHolding(row);
+    const targetAmount = data.targetAmount ?? prev.targetAmount;
+    const walletAmount = data.walletAmount ?? prev.walletAmount;
+    let currentAmount = data.currentAmount ?? prev.currentAmount;
+    let manualAmount = data.manualAmount ?? prev.manualAmount;
+    if (data.walletAmount != null && data.manualAmount == null && data.currentAmount == null) {
+      currentAmount = walletAmount + manualAmount;
+    } else if (data.currentAmount != null && data.manualAmount == null) {
+      manualAmount = Math.max(0, currentAmount - walletAmount);
+    } else {
+      currentAmount = walletAmount + manualAmount;
+    }
+    const source = sourceOf(walletAmount, manualAmount);
     const walletAddress =
       data.walletAddress === undefined ? row.wallet_address : data.walletAddress;
     const updated = await sql<HoldingRow>`
@@ -204,9 +241,11 @@ export const updateHolding = createServerFn({ method: "POST" })
           current_amount = ${currentAmount},
           source = ${source},
           wallet_address = ${walletAddress},
+          wallet_amount = ${walletAmount},
+          manual_amount = ${manualAmount},
           updated_at = now()
       where id = ${id} and user_id = ${context.userId}
-      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address
+      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
     `;
     const next = updated[0];
     if (!next) throw new Error("Failed to update holding");

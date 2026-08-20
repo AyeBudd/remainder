@@ -1,4 +1,4 @@
-export type HoldingSource = "manual" | "wallet";
+export type HoldingSource = "manual" | "wallet" | "mixed";
 
 export type Holding = {
   id: string;
@@ -9,6 +9,13 @@ export type Holding = {
   currentAmount: number;
   source: HoldingSource;
   walletAddress: string | null;
+  walletAmount: number;
+  manualAmount: number;
+};
+
+export type LinkedWallet = {
+  address: string;
+  label: string | null;
 };
 
 export type HoldingInput = Omit<Holding, "id">;

@@ -52,8 +52,8 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
           <Change24 change={change} className="mt-1" />
           <div className="mt-1 flex flex-wrap items-center gap-2">
             {met && <Badge variant="success">Target Hit</Badge>}
-            <Badge variant={holding.source === "wallet" ? "success" : "default"}>
-              {holding.source === "wallet" ? "Wallet" : "Manual"}
+            <Badge variant={holding.source === "manual" ? "default" : "success"}>
+              {holding.source === "mixed" ? "Wallet + typed" : holding.source === "wallet" ? "Wallet" : "Manual"}
             </Badge>
             {plan && (
               <Badge variant="outline">

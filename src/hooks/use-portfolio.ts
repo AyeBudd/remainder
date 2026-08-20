@@ -11,9 +11,12 @@ import {
   upsertDcaPlan,
 } from "@/lib/holdings";
 import { captureBaseline, hasBaseline } from "@/lib/dca";
-import type { DcaPlan, DcaPlanInput, Holding, HoldingInput, PriceMap } from "@/lib/types";
+import type { DcaPlan, DcaPlanInput, Holding, HoldingInput, LinkedWallet, PriceMap } from "@/lib/types";
+import { addUserWallet, listUserWallets, removeUserWallet } from "@/lib/user-wallets";
+import { normalizeAddress } from "@/lib/wallet";
 
 const LOCAL_KEY = "remainder.v1";
+const LOCAL_WALLETS = "remainder.wallets";
 
 type LocalState = {
   holdings: Holding[];
@@ -37,6 +40,8 @@ function makeSample(): LocalState {
       currentAmount: 0.37,
       source: "manual",
       walletAddress: null,
+      walletAmount: 0,
+      manualAmount: 0.37,
     },
     {
       id: "sample-eth",
@@ -47,6 +52,8 @@ function makeSample(): LocalState {
       currentAmount: 8.4,
       source: "manual",
       walletAddress: null,
+      walletAmount: 0,
+      manualAmount: 8.4,
     },
     {
       id: "sample-sol",
@@ -57,6 +64,8 @@ function makeSample(): LocalState {
       currentAmount: 64,
       source: "manual",
       walletAddress: null,
+      walletAmount: 0,
+      manualAmount: 64,
     },
   ];
   const plans: DcaPlan[] = [
@@ -78,7 +87,14 @@ function readLocal(): LocalState {
     if (raw === null) return makeSample();
     const parsed = JSON.parse(raw) as LocalState;
     if (!Array.isArray(parsed.holdings) || !Array.isArray(parsed.plans)) return makeSample();
-    return parsed;
+    return {
+      holdings: parsed.holdings.map((h) => ({
+        ...h,
+        walletAmount: h.walletAmount ?? (h.source === "wallet" ? h.currentAmount : 0),
+        manualAmount: h.manualAmount ?? (h.source === "wallet" ? 0 : h.currentAmount),
+      })),
+      plans: parsed.plans,
+    };
   } catch {
     return makeSample();
   }
@@ -92,10 +108,38 @@ function writeLocal(state: LocalState) {
   }
 }
 
+function readLocalWallets(): LinkedWallet[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(LOCAL_WALLETS);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((row): LinkedWallet[] => {
+      if (typeof row === "string") return [{ address: row.toLowerCase(), label: null }];
+      if (row && typeof row === "object" && "address" in row) {
+        return [{ address: String((row as { address: string }).address).toLowerCase(), label: null }];
+      }
+      return [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalWallets(wallets: LinkedWallet[]) {
+  try {
+    window.localStorage.setItem(LOCAL_WALLETS, JSON.stringify(wallets.map((w) => w.address)));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function usePortfolio() {
   const { user, isPending } = useCurrentUserState();
   const [holdings, setHoldings] = useState<Holding[]>(() => makeSample().holdings);
   const [plans, setPlans] = useState<DcaPlan[]>(() => makeSample().plans);
+  const [wallets, setWallets] = useState<LinkedWallet[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
   const signedIn = Boolean(user);
@@ -104,19 +148,26 @@ export function usePortfolio() {
     setError(null);
     if (user) {
       try {
-        const [nextHoldings, nextPlans] = await Promise.all([listHoldings(), listDcaPlans()]);
+        const [nextHoldings, nextPlans, nextWallets] = await Promise.all([
+          listHoldings(),
+          listDcaPlans(),
+          listUserWallets(),
+        ]);
         setHoldings(nextHoldings);
         setPlans(nextPlans);
+        setWallets(nextWallets);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Could not load holdings");
         setHoldings([]);
         setPlans([]);
+        setWallets([]);
       }
       return;
     }
     const local = readLocal();
     setHoldings(local.holdings);
     setPlans(local.plans);
+    setWallets(readLocalWallets());
   }, [user]);
 
   useEffect(() => {
@@ -134,7 +185,12 @@ export function usePortfolio() {
       setHoldings((prev) => [...(prev ?? []), created]);
       return created;
     }
-    const created: Holding = { ...input, id: crypto.randomUUID() };
+    const created: Holding = {
+      ...input,
+      id: crypto.randomUUID(),
+      walletAmount: input.walletAmount ?? 0,
+      manualAmount: input.manualAmount ?? input.currentAmount,
+    };
     setHoldings((prev) => {
       const next = [...(prev ?? []), created];
       persistGuest(next, plans);
@@ -153,7 +209,19 @@ export function usePortfolio() {
     setHoldings((prev) => {
       const next = (prev ?? []).map((h) => {
         if (h.id !== id) return h;
-        updated = { ...h, ...patch };
+        const walletAmount = patch.walletAmount ?? h.walletAmount;
+        const manualAmount =
+          patch.manualAmount ??
+          (patch.currentAmount != null && patch.walletAmount == null
+            ? Math.max(0, patch.currentAmount - walletAmount)
+            : h.manualAmount);
+        const currentAmount =
+          patch.walletAmount != null && patch.currentAmount == null
+            ? walletAmount + manualAmount
+            : patch.currentAmount ?? walletAmount + manualAmount;
+        const source =
+          walletAmount > 0 && manualAmount > 0 ? "mixed" : walletAmount > 0 ? "wallet" : "manual";
+        updated = { ...h, ...patch, walletAmount, manualAmount, currentAmount, source };
         return updated;
       });
       persistGuest(next, plans);
@@ -226,6 +294,32 @@ export function usePortfolio() {
     });
   };
 
+  const addWallet = async (address: string) => {
+    const normalized = normalizeAddress(address);
+    if (user) {
+      const next = await addUserWallet({ data: normalized });
+      setWallets(next);
+      return next;
+    }
+    const next = [...wallets.filter((w) => w.address !== normalized), { address: normalized, label: null }];
+    setWallets(next);
+    writeLocalWallets(next);
+    return next;
+  };
+
+  const removeWallet = async (address: string) => {
+    const normalized = normalizeAddress(address);
+    if (user) {
+      const next = await removeUserWallet({ data: normalized });
+      setWallets(next);
+      return next;
+    }
+    const next = wallets.filter((w) => w.address !== normalized);
+    setWallets(next);
+    writeLocalWallets(next);
+    return next;
+  };
+
   const loadSample = () => {
     const sample = makeSample();
     setHoldings(sample.holdings);
@@ -236,12 +330,15 @@ export function usePortfolio() {
   return {
     holdings,
     plans,
+    wallets,
     error,
     isLoading: Boolean(user) && !booted,
     signedIn,
     add,
     update,
     remove,
+    addWallet,
+    removeWallet,
     savePlan,
     ensureBaselines,
     removePlan,

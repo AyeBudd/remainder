@@ -87,13 +87,13 @@ export function Dashboard() {
   };
 
   const applyWallet = async (
-    updates: { id: string; currentAmount: number; walletAddress: string }[],
+    updates: { id: string; walletAmount: number; walletAddress: string }[],
   ) => {
     for (const u of updates) {
       await portfolio.update(u.id, {
-        currentAmount: u.currentAmount,
-        source: "wallet",
+        walletAmount: u.walletAmount,
         walletAddress: u.walletAddress,
+        source: u.walletAmount > 0 ? "wallet" : "manual",
       });
     }
   };
@@ -231,7 +231,7 @@ export function Dashboard() {
             )}
             <Button variant="outline" onClick={() => setWalletOpen(true)}>
               <Wallet />
-              Wallet
+              {portfolio.wallets.length > 1 ? `Wallets (${portfolio.wallets.length})` : "Wallets"}
             </Button>
             <Button onClick={() => setAddOpen(true)}>
               <Plus />
@@ -309,6 +309,9 @@ export function Dashboard() {
         open={walletOpen}
         onOpenChange={setWalletOpen}
         holdings={holdings}
+        wallets={portfolio.wallets}
+        onAddWallet={(address) => portfolio.addWallet(address).then(() => undefined)}
+        onRemoveWallet={(address) => portfolio.removeWallet(address).then(() => undefined)}
         onApply={applyWallet}
         onAddFromWallet={(input) => portfolio.add(input).then(() => undefined)}
       />

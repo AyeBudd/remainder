@@ -118,8 +118,10 @@ export function AddHoldingDialog({
           coingeckoId: chosen.coingeckoId,
           targetAmount,
           currentAmount,
-          source: editing?.source ?? "manual",
+          source: editing?.source === "wallet" || editing?.source === "mixed" ? editing.source : "manual",
           walletAddress: editing?.walletAddress ?? null,
+          walletAmount: editing?.walletAmount ?? 0,
+          manualAmount: Math.max(0, currentAmount - (editing?.walletAmount ?? 0)),
         },
         editing?.id,
       );
