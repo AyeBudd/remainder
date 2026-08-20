@@ -30,9 +30,19 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
   const currentUsd = price != null ? holding.currentAmount * price : null;
   const remainUsd = price != null ? remain * price : null;
   const met = remain <= 0;
+  const surplusUsd =
+    met && currentUsd != null && price != null
+      ? currentUsd - holding.targetAmount * price
+      : 0;
 
   return (
-    <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+    <article
+      className={
+        met
+          ? "rounded-xl bg-success/20 p-4 outline outline-1 outline-success/45 sm:p-5"
+          : "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5"
+      }
+    >
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-baseline gap-2">
@@ -41,6 +51,7 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
           </div>
           <Change24 change={change} className="mt-1" />
           <div className="mt-1 flex flex-wrap items-center gap-2">
+            {met && <Badge variant="success">Target Hit</Badge>}
             <Badge variant={holding.source === "wallet" ? "success" : "default"}>
               {holding.source === "wallet" ? "Wallet" : "Manual"}
             </Badge>
@@ -76,18 +87,34 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
         </p>
         <p className="font-mono text-sm tabular-nums">{formatPercent(ratio)}</p>
       </div>
-      <Progress className="mt-2" value={Math.min(100, ratio * 100)} />
+      <Progress
+        className={met ? "mt-2 bg-success/25" : "mt-2"}
+        indicatorClassName={met ? "bg-success" : undefined}
+        value={Math.min(100, ratio * 100)}
+      />
 
       <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs tracking-wide text-muted-foreground uppercase">
-            {met ? "Surplus" : "Capital remaining"}
-          </p>
-          <p className="font-serif text-3xl tracking-tight tabular-nums">
-            {remainUsd != null
-              ? formatUsd(met ? (currentUsd ?? 0) - holding.targetAmount * (price ?? 0) : remainUsd)
-              : `${formatCoins(remain, holding.symbol)} ${holding.symbol}`}
-          </p>
+          {met ? (
+            <>
+              <p className="text-xs tracking-wide text-success uppercase">Complete</p>
+              <p className="font-serif text-3xl tracking-tight text-success">Target Hit</p>
+              {surplusUsd > 0.009 && (
+                <p className="mt-1 text-sm tabular-nums text-success/80">
+                  {formatUsd(surplusUsd)} over target
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-xs tracking-wide text-muted-foreground uppercase">Capital remaining</p>
+              <p className="font-serif text-3xl tracking-tight tabular-nums">
+                {remainUsd != null
+                  ? formatUsd(remainUsd)
+                  : `${formatCoins(remain, holding.symbol)} ${holding.symbol}`}
+              </p>
+            </>
+          )}
           {currentUsd != null && (
             <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {formatUsd(currentUsd, { precise: true })} held
