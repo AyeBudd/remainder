@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { defaultTargetDate, frequencyNoun, quoteDca } from "@/lib/dca";
+import { DcaChart } from "@/components/dca-chart";
 import { formatCoins, formatUsd, parseAmount } from "@/lib/format";
 import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -197,51 +197,7 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
       )}
 
       {quote && quote.series.length > 1 && (
-        <div className="mt-6 h-52">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={quote.series} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="remainFill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-foreground)" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="var(--color-foreground)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid stroke="var(--color-border)" vertical={false} />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                minTickGap={28}
-              />
-              <YAxis
-                tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
-                axisLine={false}
-                tickLine={false}
-                width={48}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: "var(--color-popover)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 8,
-                  color: "var(--color-foreground)",
-                }}
-                formatter={(value) => [
-                  `${formatCoins(Number(value), holding.symbol)} ${holding.symbol}`,
-                  "Projected",
-                ]}
-              />
-              <Area
-                type="monotone"
-                dataKey="amount"
-                stroke="var(--color-foreground)"
-                fill="url(#remainFill)"
-                strokeWidth={1.5}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+        <DcaChart series={quote.series} milestones={quote.milestones} symbol={holding.symbol} />
       )}
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}

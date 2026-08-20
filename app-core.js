@@ -431,16 +431,33 @@ function quoteDca(h, plan){
   const now = new Date();
   const past = startDay(target) <= startDay(now);
   const met = rem <= 0;
-  if (met || past) return { periods:0, rem, remUsd, coins:0, usd: rem===0?0:null, price, past, met, series:[{label:"Now", amount:h.current}] };
+  if (met || past) return { periods:0, rem, remUsd, coins:0, usd: rem===0?0:null, price, past, met, series:[{label:"Now", amount:h.current, full:"Now", date:iso(now), usd: price!=null?h.current*price:null, fill:h.target>0?h.current/h.target:0}], milestones:[] };
   const periods = countPeriods(now, target, plan.frequency);
   const coins = rem/periods;
   const usd = remUsd != null ? remUsd/periods : null;
-  const series = [{label:"Now", amount:h.current}];
+  const series = [{label:"Now", amount:h.current, full:"Now", date:iso(now), usd: price!=null?h.current*price:null, fill:h.target>0?h.current/h.target:0}];
   for (let i=1;i<=periods;i++){
     const d = step(now, plan.frequency, i);
-    series.push({ label: d.toLocaleDateString("en-US",{month:"short",day:"numeric"}), amount: Math.min(h.target, h.current + coins*i) });
+    const amount = Math.min(h.target, h.current + coins*i);
+    series.push({
+      label: d.toLocaleDateString("en-US",{month:"short",day:"numeric"}),
+      full: d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}),
+      date: iso(d),
+      amount,
+      usd: price!=null ? amount*price : null,
+      fill: h.target>0 ? amount/h.target : 0,
+    });
   }
-  return { periods, rem, remUsd, coins, usd, price, past, met, series };
+  const milestones = [];
+  for (const pct of [25,50,75]) {
+    const need = h.target * (pct/100);
+    if (h.current + 1e-12 >= need) continue;
+    const hit = series.find(p => p.amount + 1e-12 >= need);
+    if (!hit) continue;
+    hit.milestone = pct;
+    milestones.push({ pct, date: hit.date, label: hit.label, full: hit.full, amount: hit.amount, usd: hit.usd });
+  }
+  return { periods, rem, remUsd, coins, usd, price, past, met, series, milestones };
 }
 
 function esc(s){
@@ -587,9 +604,10 @@ function applyWallet(){
   persist(); closeDialog();
 }
 
-function chartSvg(series){
+function chartSvg(series, symbol, milestones){
   if (!series || series.length<2) return "";
-  const w=640, h=200, pl=8, pr=8, pt=10, pb=24;
+  const marks = milestones || series.filter(s => s.milestone).map(s => ({ pct:s.milestone, date:s.date, label:s.label, full:s.full, amount:s.amount, usd:s.usd }));
+  const w=640, h=240, pl=10, pr=10, pt=16, pb=28;
   const xs = series.map((_,i)=> pl + (i/(series.length-1))*(w-pl-pr));
   const ys = series.map(s=>s.amount);
   const min = Math.min(...ys), max = Math.max(...ys);
@@ -597,10 +615,45 @@ function chartSvg(series){
   const py = v => pt + (1-((v-min)/span))*(h-pt-pb);
   const line = xs.map((x,i)=> `${i?"L":"M"}${x.toFixed(1)},${py(ys[i]).toFixed(1)}`).join(" ");
   const area = `${line} L${xs[xs.length-1].toFixed(1)},${h-pb} L${xs[0].toFixed(1)},${h-pb} Z`;
-  const ticks = [0, Math.floor((series.length-1)/2), series.length-1].filter((v,i,a)=>a.indexOf(v)===i);
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
-    <path d="${area}" fill="var(--fg)" fill-opacity="0.16"/>
-    <path d="${line}" fill="none" stroke="var(--fg)" stroke-width="1.6"/>
-    ${ticks.map(i=>`<text x="${xs[i]}" y="${h-6}" fill="var(--muted)" font-size="11" text-anchor="${i===0?"start":i===series.length-1?"end":"middle"}">${esc(series[i].label)}</text>`).join("")}
-  </svg>`;
+  const keep = new Set([0, series.length-1]);
+  series.forEach((s,i)=>{ if (s.milestone) keep.add(i); });
+  const stepN = series.length <= 20 ? 1 : Math.ceil((series.length-1)/12);
+  for (let i=0;i<series.length;i+=stepN) keep.add(i);
+  const pts = series.map((s,i)=>({
+    x: (xs[i]/w)*100,
+    y: (py(s.amount)/h)*100,
+    date: s.full || s.label,
+    amount: s.amount,
+    usd: s.usd,
+    fill: s.fill,
+    milestone: s.milestone || null,
+    i,
+  }));
+  const axis = [0, ...series.map((s,i)=> s.milestone ? i : -1).filter(i=>i>=0), series.length-1]
+    .filter((v,i,a)=>v>=0 && a.indexOf(v)===i);
+  const strip = marks.length ? `<div class="dca-marks">${marks.map(m=>`<div><p class="dca-pct">${m.pct}%</p><p class="held">${esc(m.full)}</p></div>`).join("")}</div>` : "";
+  const dots = [...keep].map(i => {
+    const s = series[i];
+    const big = Boolean(s.milestone);
+    return `<span class="dca-dot${big?" dca-dot-mark":""}" style="left:${(xs[i]/w)*100}%;top:${(py(s.amount)/h)*100}%"></span>`;
+  }).join("");
+  const vlines = marks.map(m => {
+    const i = series.findIndex(s => s.date===m.date || s.milestone===m.pct);
+    if (i<0) return "";
+    return `<div class="dca-vline" style="left:${(xs[i]/w)*100}%"></div>`;
+  }).join("");
+  return `${strip}<div class="dca-plot" data-symbol="${esc(symbol||"")}" data-pts="${esc(JSON.stringify(pts))}">
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <path d="${area}" fill="var(--fg)" fill-opacity="0.16"/>
+      <path d="${line}" fill="none" stroke="var(--fg)" stroke-width="1.6"/>
+      ${axis.map(i=>{
+        const label = series[i].milestone ? series[i].milestone+"%" : (i===0?"Now":series[i].label);
+        const anchor = i===0?"start":i===series.length-1?"end":"middle";
+        return `<text x="${xs[i]}" y="${h-6}" fill="var(--muted)" font-size="11" text-anchor="${anchor}">${esc(String(label))}</text>`;
+      }).join("")}
+    </svg>
+    ${vlines}
+    <div class="dca-dots">${dots}</div>
+    <div class="dca-tip" hidden></div>
+  </div>`;
 }

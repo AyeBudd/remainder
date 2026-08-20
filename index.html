@@ -153,8 +153,19 @@
     @media (min-width: 640px) { .quote { grid-template-columns: 1fr 1fr 1fr; } }
     .q { border-radius: 0.5rem; background: rgb(28 29 28 / 0.7); padding: 0.75rem 1rem; }
     .q p { margin: 0; }
-    .chart { margin-top: 1.5rem; height: 13rem; }
-    .chart svg { width: 100%; height: 100%; display: block; }
+    .chart { margin-top: 1.5rem; }
+    .dca-marks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem; }
+    .dca-pct { margin: 0; font-family: var(--serif); font-size: 1.5rem; letter-spacing: -0.02em; }
+    .dca-plot { position: relative; height: 16rem; }
+    .dca-plot svg { width: 100%; height: 100%; display: block; }
+    .dca-dots, .dca-vline { pointer-events: none; }
+    .dca-dots { position: absolute; inset: 0; }
+    .dca-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 999px; background: var(--fg); }
+    .dca-dot-mark { width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; box-shadow: 0 0 0 4px rgb(240 239 232 / 0.16); }
+    .dca-vline { position: absolute; top: 0; bottom: 1.6rem; width: 1px; background: rgb(240 239 232 / 0.18); }
+    .dca-tip { position: absolute; z-index: 3; min-width: 9rem; padding: 0.5rem 0.75rem; border-radius: 0.5rem; background: var(--card); box-shadow: var(--shadow); pointer-events: none; }
+    .dca-tip-date { margin: 0; font-family: var(--serif); font-size: 1.125rem; }
+    .dca-tip .amt { margin: 0.25rem 0 0; }
     .err { margin-top: 0.75rem; font-size: 0.875rem; color: var(--danger); }
     .overlay {
       position: fixed; inset: 0; z-index: 50; background: rgb(12 13 12 / 0.7);
@@ -227,9 +238,9 @@
 </head>
 <body>
   <div id="app"></div>
-  <script src="./app-catalog.js?v=8"></script>
-  <script src="./app-core.js?v=8"></script>
-  <script src="./app-ui.js?v=8"></script>
+  <script src="./app-catalog.js?v=9"></script>
+  <script src="./app-core.js?v=9"></script>
+  <script src="./app-ui.js?v=9"></script>
 
 </body>
 </html>

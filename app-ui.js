@@ -132,7 +132,7 @@ function render(){
         <div class="q"><p class="stat-label">Buys remaining</p><p class="stat-value">${q.met||q.past?"—":q.periods}</p>${q.remUsd!=null?`<p class="held">${esc(formatUsd(q.remUsd))} left</p>`:""}</div>
         <div class="q"><p class="stat-label">Price used</p><p class="stat-value">${q.price!=null?esc(formatUsd(q.price,{precise:true})):"Unavailable"}</p><p class="held">${state.form.assumed?"Assumed":"Live"}</p></div>
       </div>` : ""}
-      ${q && q.series.length>1 ? `<div class="chart">${chartSvg(q.series)}</div>` : ""}
+      ${q && q.series.length>1 ? `<div class="chart">${chartSvg(q.series, hDca.symbol, q.milestones)}</div>` : ""}
       ${state.form.err ? `<p class="err">${esc(state.form.err)}</p>` : ""}
       <div class="actions" style="margin-top:1.25rem">
         <button class="btn btn-primary" data-act="save-plan">${plan?"Update plan":"Save plan"}</button>
@@ -482,6 +482,33 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.navOpen) { state.navOpen = false; render(); }
 });
 
+document.addEventListener("mousemove", (e) => {
+  const plot = e.target && e.target.closest && e.target.closest(".dca-plot");
+  const open = document.querySelectorAll(".dca-tip");
+  if (!plot) { open.forEach((t) => { t.hidden = true; }); return; }
+  let pts;
+  try { pts = JSON.parse(plot.dataset.pts || "[]"); } catch { return; }
+  if (!pts.length) return;
+  const rect = plot.getBoundingClientRect();
+  const x = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+  let best = pts[0], dist = Infinity;
+  for (const p of pts) {
+    const d = Math.abs(p.x - x);
+    if (d < dist) { dist = d; best = p; }
+  }
+  const tip = plot.querySelector(".dca-tip");
+  if (!tip) return;
+  const sym = plot.dataset.symbol || "";
+  const fill = Number.isFinite(best.fill) ? formatPct(best.fill) + " of target" : "";
+  tip.hidden = false;
+  tip.innerHTML = `<p class="dca-tip-date">${esc(best.date)}</p><p class="amt">${esc(formatCoins(best.amount, sym))} ${esc(sym)}</p>${best.usd!=null?`<p class="held">${esc(formatUsd(best.usd))}</p>`:""}${fill?`<p class="held">${esc(fill)}</p>`:""}`;
+  const tw = tip.offsetWidth || 148;
+  const left = Math.min(rect.width - tw - 8, Math.max(8, (best.x/100)*rect.width + 10));
+  const top = Math.max(8, (best.y/100)*rect.height - 64);
+  tip.style.left = left+"px";
+  tip.style.top = top+"px";
+});
+
 render();
 loadPrices();
 if (state.page === "btc") loadBtcTracker(false);
@@ -490,6 +517,7 @@ setInterval(() => { if (state.page === "btc") loadBtcTracker(false); }, 60000);
 setInterval(() => {
   if (state.priceAt && !state.dialog && !state.menu && !state.sortOpen && !state.navOpen) {
     if (state.page === "what-if" && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.wif) return;
+    if (document.querySelector(".dca-plot:hover")) return;
     render();
   }
 }, 15000);
