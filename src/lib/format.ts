@@ -49,6 +49,16 @@ export function formatAddress(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
 }
 
+export function formatUpdated(at: number, now = Date.now()): string {
+  if (!at) return "not yet";
+  const sec = Math.max(0, Math.round((now - at) / 1000));
+  if (sec < 15) return "just now";
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.round(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  return new Date(at).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
 export function parseAmount(raw: string): number | null {
   const cleaned = raw.replace(/,/g, "").trim();
   if (!cleaned) return null;
