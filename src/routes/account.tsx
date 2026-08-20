@@ -1,9 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { authClient } from "@/lib/auth/client";
+import { authClient, signOut } from "@/lib/auth/client";
 import { RedirectToSignIn } from "@/lib/auth/gates";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
-import { getAccount, saveAccountPrefs, updateAccountEmail, type AccountPrefs } from "@/lib/account";
+import { deleteAccount, getAccount, saveAccountPrefs, updateAccountEmail, type AccountPrefs } from "@/lib/account";
+import { downloadLedgerCsv } from "@/lib/export-ledger";
+import { usePortfolio } from "@/hooks/use-portfolio";
+import { usePrices } from "@/hooks/use-prices";
 import { SiteHeader } from "@/components/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +16,8 @@ export const Route = createFileRoute("/account")({ component: AccountPage });
 
 function AccountPage() {
   const { user, isPending } = useCurrentUserState();
+  const portfolio = usePortfolio();
+  const { prices } = usePrices();
   const [prefs, setPrefs] = useState<AccountPrefs | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,6 +27,7 @@ function AccountPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState("");
 
   useEffect(() => {
     if (user) {
@@ -131,6 +137,27 @@ function AccountPage() {
     } catch (err) {
       flash(null, err instanceof Error ? err.message : "Could not save preferences");
     } finally {
+      setBusy(null);
+    }
+  };
+
+  const exportCsv = () => {
+    downloadLedgerCsv(portfolio.holdings, portfolio.plans, prices);
+  };
+
+  const destroy = async (e: FormEvent) => {
+    e.preventDefault();
+    if (confirmDelete.trim().toUpperCase() !== "DELETE") {
+      flash(null, "Type DELETE to confirm.");
+      return;
+    }
+    setBusy("delete");
+    flash(null, null);
+    try {
+      await deleteAccount({ data: "DELETE" });
+      await signOut("/");
+    } catch (err) {
+      flash(null, err instanceof Error ? err.message : "Could not delete account");
       setBusy(null);
     }
   };
@@ -258,6 +285,51 @@ function AccountPage() {
               Prefs save now. Outbound mail starts after RESEND_API_KEY (and EMAIL_FROM) are set on the host.
             </p>
           )}
+        </section>
+
+        <section className="mt-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6">
+          <h2 className="font-serif text-2xl tracking-tight">Export</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            CSV of each target: amounts, remaining USD, cost basis, and DCA cadence / ETA. For your records
+            or tax software — Remaindr does not file anything.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-5"
+            onClick={exportCsv}
+            disabled={portfolio.holdings.length === 0}
+          >
+            Download CSV
+          </Button>
+        </section>
+
+        <section className="mt-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6">
+          <h2 className="font-serif text-2xl tracking-tight text-destructive">Delete account</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Permanently removes this account, holdings, wallets, DCA plans, and settings. This cannot be undone.
+            Export first if you want a copy.
+          </p>
+          <form className="mt-5 space-y-3" onSubmit={(e) => void destroy(e)}>
+            <div className="space-y-1.5">
+              <Label htmlFor="confirm-delete">Type DELETE to confirm</Label>
+              <Input
+                id="confirm-delete"
+                value={confirmDelete}
+                onChange={(e) => setConfirmDelete(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </div>
+            <Button
+              type="submit"
+              variant="outline"
+              className="border-destructive text-destructive hover:bg-destructive/10"
+              disabled={busy === "delete" || confirmDelete.trim().toUpperCase() !== "DELETE"}
+            >
+              {busy === "delete" ? "Deleting…" : "Delete account and data"}
+            </Button>
+          </form>
         </section>
       </main>
     </div>

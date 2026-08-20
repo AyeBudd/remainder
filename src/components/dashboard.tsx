@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpDown, Check, Plus, RefreshCw, Wallet } from "lucide-react";
+import { ArrowUpDown, Check, Download, Plus, RefreshCw, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
+import { downloadLedgerCsv } from "@/lib/export-ledger";
 import { formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
 import { unrealizedPnl } from "@/lib/pnl";
 import {
@@ -258,6 +259,16 @@ export function Dashboard() {
                   })}
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+            {holdings.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => downloadLedgerCsv(holdings, portfolio.plans, prices)}
+                aria-label="Export holdings as CSV"
+              >
+                <Download />
+                Export CSV
+              </Button>
             )}
             <Button variant="outline" onClick={() => setWalletOpen(true)}>
               <Wallet />

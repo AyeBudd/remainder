@@ -109,6 +109,29 @@ export const saveAccountPrefs = createServerFn({ method: "POST" })
     return loadPrefs(context.userId);
   });
 
+export const deleteAccount = createServerFn({ method: "POST" })
+  .middleware([authMiddleware])
+  .validator((input: unknown) => z.literal("DELETE").parse(String(input ?? "").trim().toUpperCase()))
+  .handler(async ({ context }) => {
+    const sql = await getSql();
+    const id = context.userId;
+    const users = await sql<{ email: string | null }>`
+      select email from "user" where id = ${id}
+    `;
+    await sql`delete from dca_plans where user_id = ${id}`;
+    await sql`delete from holdings where user_id = ${id}`;
+    await sql`delete from user_wallets where user_id = ${id}`;
+    await sql`delete from user_settings where user_id = ${id}`;
+    const email = users[0]?.email;
+    if (email) {
+      await sql`delete from verification where identifier = ${email}`;
+    }
+    await sql`delete from "session" where "userId" = ${id}`;
+    await sql`delete from "account" where "userId" = ${id}`;
+    await sql`delete from "user" where id = ${id}`;
+    return { ok: true as const };
+  });
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
