@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpDown, Check, Download, Plus, RefreshCw, Wallet } from "lucide-react";
+import { ArrowUpDown, Check, Download, Plus, RefreshCw, Upload, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
 import { downloadLedgerCsv } from "@/lib/export-ledger";
 import { formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
@@ -19,6 +19,7 @@ import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import { veil } from "@/lib/privacy";
 import { AddBuyDialog } from "@/components/add-buy-dialog";
 import { AddHoldingDialog } from "@/components/add-holding-dialog";
+import { ImportCsvDialog } from "@/components/import-csv-dialog";
 import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
@@ -39,6 +40,7 @@ export function Dashboard() {
   const { hidden: hideAmounts } = useHideAmounts();
   const [addOpen, setAddOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
   const [buying, setBuying] = useState<Holding | null>(null);
   const [dcaId, setDcaId] = useState<string | null>(null);
@@ -298,6 +300,14 @@ export function Dashboard() {
                 Export CSV
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={() => setImportOpen(true)}
+              aria-label="Import holdings from CSV"
+            >
+              <Upload />
+              Import CSV
+            </Button>
             <Button variant="outline" onClick={() => setWalletOpen(true)}>
               <Wallet />
               {portfolio.wallets.length > 1 ? `Wallets (${portfolio.wallets.length})` : "Wallets"}
@@ -315,6 +325,7 @@ export function Dashboard() {
           <EmptyState
             signedIn={portfolio.signedIn}
             onAdd={() => setAddOpen(true)}
+            onImport={() => setImportOpen(true)}
             onSample={
               portfolio.signedIn
                 ? undefined
@@ -389,6 +400,16 @@ export function Dashboard() {
           await portfolio.update(buying.id, patch);
         }}
       />
+      <ImportCsvDialog
+        open={importOpen}
+        holdings={holdings}
+        assets={assets}
+        prices={prices}
+        onOpenChange={setImportOpen}
+        onAdd={portfolio.add}
+        onUpdate={portfolio.update}
+        onPlan={portfolio.savePlan}
+      />
       <WalletDialog
         open={walletOpen}
         onOpenChange={setWalletOpen}
@@ -430,10 +451,12 @@ function MiniStat({
 function EmptyState({
   signedIn,
   onAdd,
+  onImport,
   onSample,
 }: {
   signedIn: boolean;
   onAdd: () => void;
+  onImport: () => void;
   onSample?: () => void;
 }) {
   return (
@@ -447,6 +470,10 @@ function EmptyState({
         <Button onClick={onAdd}>
           <Plus />
           Add target
+        </Button>
+        <Button variant="outline" onClick={onImport}>
+          <Upload />
+          Import CSV
         </Button>
         {onSample && (
           <Button variant="outline" onClick={onSample}>

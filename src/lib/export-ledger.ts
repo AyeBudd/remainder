@@ -18,7 +18,7 @@ function etaDays(plan: DcaPlan | undefined, now: Date): number | null {
   return differenceInCalendarDays(startOfDay(target), startOfDay(now));
 }
 
-const HEADERS = [
+export const LEDGER_CSV_HEADERS = [
   "symbol",
   "name",
   "coingecko_id",
@@ -41,7 +41,7 @@ const HEADERS = [
 ] as const;
 
 export function ledgerCsv(holdings: Holding[], plans: DcaPlan[], prices: PriceMap, now = new Date()): string {
-  const lines = [HEADERS.join(",")];
+  const lines = [LEDGER_CSV_HEADERS.join(",")];
   for (const holding of holdings) {
     const price = prices[holding.coingeckoId];
     const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
