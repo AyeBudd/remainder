@@ -42,5 +42,6 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
+  // Disable rules that conflict with Prettier formatting.
   prettier,
 );

@@ -17,6 +17,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   existingSymbols: string[];
+  assets?: Asset[];
   editing?: Holding | null;
   initialAsset?: Asset | null;
   initialCurrent?: number;
@@ -27,13 +28,16 @@ export function AddHoldingDialog({
   open,
   onOpenChange,
   existingSymbols,
+  assets = ASSETS,
   editing,
   initialAsset,
   initialCurrent,
   onSave,
 }: Props) {
   const [query, setQuery] = useState("");
-  const [asset, setAsset] = useState<Asset | null>(editing ? ASSETS.find((a) => a.symbol === editing.symbol) ?? null : initialAsset ?? null);
+  const [asset, setAsset] = useState<Asset | null>(
+    editing ? assets.find((a) => a.symbol === editing.symbol) ?? null : initialAsset ?? null,
+  );
   const [customSymbol, setCustomSymbol] = useState("");
   const [customId, setCustomId] = useState("");
   const [target, setTarget] = useState(editing ? String(editing.targetAmount) : "");
@@ -61,15 +65,16 @@ export function AddHoldingDialog({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return ASSETS.filter((a) => {
+    const filtered = assets.filter((a) => {
       if (!q) return true;
       return (
         a.symbol.toLowerCase().includes(q) ||
         a.name.toLowerCase().includes(q) ||
         a.coingeckoId.includes(q)
       );
-    }).slice(0, 12);
-  }, [query]);
+    });
+    return q ? filtered.slice(0, 40) : filtered;
+  }, [assets, query]);
 
   const submit = async () => {
     setError(null);
@@ -131,23 +136,23 @@ export function AddHoldingDialog({
         <DialogHeader>
           <DialogTitle>{editing ? `Edit ${editing.symbol}` : "Add a target"}</DialogTitle>
           <DialogDescription>
-            Set how much you want to hold. Current amount can be typed in or filled from a wallet later.
+            Pick from the current top 100 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.
           </DialogDescription>
         </DialogHeader>
 
         {!editing && (
           <div className="space-y-2">
-            <Label htmlFor="asset-search">Asset</Label>
+            <Label htmlFor="asset-search">Top 100 assets</Label>
             {!useCustom && (
               <>
                 <Input
                   id="asset-search"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search Bitcoin, ETH, SOL…"
+                  placeholder="Search Bitcoin, HYPE, PENGU…"
                   autoComplete="off"
                 />
-                <div className="grid max-h-44 grid-cols-2 gap-1 overflow-y-auto sm:grid-cols-3">
+                <div className="grid max-h-56 grid-cols-2 gap-1 overflow-y-auto sm:grid-cols-3">
                   {matches.map((item) => {
                     const taken = existingSymbols.includes(item.symbol);
                     const selected = asset?.symbol === item.symbol;
@@ -163,7 +168,14 @@ export function AddHoldingDialog({
                             : "bg-secondary text-foreground hover:bg-secondary/70"
                         } disabled:opacity-35`}
                       >
-                        <div className="text-sm font-medium">{item.symbol}</div>
+                        <div className="flex items-baseline justify-between gap-1">
+                          <div className="text-sm font-medium">{item.symbol}</div>
+                          {item.rank != null && item.rank <= 100 && (
+                            <div className={`text-[10px] tabular-nums ${selected ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                              #{item.rank}
+                            </div>
+                          )}
+                        </div>
                         <div className={`truncate text-xs ${selected ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                           {taken ? "Added" : item.name}
                         </div>

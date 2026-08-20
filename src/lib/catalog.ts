@@ -5,7 +5,7 @@ import {
   overlaySeedFromLive,
   type Asset,
 } from "./assets";
-import { BAKED_TOP_100 } from "./top100";
+import { BAKED_TOP_100 } from "@/lib/baked-assets";
 
 export type MarketPayload = {
   assets: Asset[];

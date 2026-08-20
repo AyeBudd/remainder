@@ -1,3 +1,5 @@
+import { BAKED_TOP_100 } from "@/lib/baked-assets";
+
 export type EthereumToken = {
   address: `0x${string}` | "native";
   decimals: number;
@@ -10,13 +12,14 @@ export type Asset = {
   name: string;
   coingeckoId: string;
   decimals: number;
+  rank?: number;
   paprikaId?: string;
   coinbasePair?: string;
   ethereum?: EthereumToken;
   binancePair?: string;
 };
 
-export const ASSETS: Asset[] = [
+export const SEED_ASSETS: Asset[] = [
   {
     symbol: "BTC",
     name: "Bitcoin",
@@ -300,11 +303,100 @@ export const ASSETS: Asset[] = [
   },
 ];
 
+const STABLE = new Set([
+  "USDT",
+  "USDC",
+  "USDE",
+  "DAI",
+  "PYUSD",
+  "FDUSD",
+  "TUSD",
+  "USDD",
+  "USDG",
+  "GHO",
+  "RLUSD",
+  "BFUSD",
+  "EURC",
+  "EUROC",
+  "FRAX",
+  "USDS",
+  "SUSDS",
+  "SUSDE",
+]);
+
+export function decimalsForPrice(price: number, symbol: string): number {
+  if (STABLE.has(symbol.toUpperCase())) return 2;
+  if (symbol === "BTC" || symbol === "WBTC" || symbol === "CBBTC" || symbol === "LBTC") return 8;
+  if (price >= 1000) return 6;
+  if (price >= 10) return 4;
+  if (price >= 0.1) return 3;
+  if (price >= 0.01) return 2;
+  return 0;
+}
+
+export function overlaySeedFromLive(live: Asset[]): Asset[] {
+  return overlaySeed(live, SEED_ASSETS);
+}
+
+function overlaySeed(live: Asset[], seed: Asset[]): Asset[] {
+  const seedByGecko = new Map(seed.map((s) => [s.coingeckoId, s]));
+  const seedBySymbol = new Map(seed.map((s) => [s.symbol.toUpperCase(), s]));
+  const used = new Set<string>();
+  const out: Asset[] = live.map((row) => {
+    const match = seedByGecko.get(row.coingeckoId) ?? seedBySymbol.get(row.symbol.toUpperCase());
+    if (!match) return row;
+    used.add(match.coingeckoId);
+    return {
+      ...match,
+      symbol: row.symbol,
+      name: row.name,
+      coingeckoId: row.coingeckoId,
+      rank: row.rank,
+      decimals: match.decimals,
+      coinbasePair: match.coinbasePair ?? row.coinbasePair,
+      binancePair: match.binancePair ?? row.binancePair,
+    };
+  });
+  for (const extra of seed) {
+    if (!used.has(extra.coingeckoId) && !out.some((a) => a.symbol === extra.symbol)) {
+      out.push(extra);
+    }
+  }
+  return out;
+}
+
+export function catalogFromBaked(): Asset[] {
+  const live: Asset[] = BAKED_TOP_100.map((row) => ({
+    symbol: row.symbol,
+    name: row.name,
+    coingeckoId: row.coingeckoId,
+    decimals: STABLE.has(row.symbol) ? 2 : row.decimals,
+    rank: row.rank,
+    coinbasePair: row.coinbasePair,
+    binancePair: row.binancePair,
+  }));
+  return overlaySeed(live, SEED_ASSETS);
+}
+
+let activeCatalog: Asset[] = catalogFromBaked();
+
+export function getActiveCatalog(): Asset[] {
+  return activeCatalog;
+}
+
+export function setActiveCatalog(next: Asset[]): void {
+  if (next.length === 0) return;
+  activeCatalog = overlaySeed(next, SEED_ASSETS);
+}
+
+export const ASSETS: Asset[] = catalogFromBaked();
+
 export const ASSET_BY_SYMBOL = new Map(ASSETS.map((a) => [a.symbol, a]));
 export const ASSET_BY_COINGECKO = new Map(ASSETS.map((a) => [a.coingeckoId, a]));
 
 export function getAsset(symbol: string): Asset | undefined {
-  return ASSET_BY_SYMBOL.get(symbol.toUpperCase());
+  const key = symbol.toUpperCase();
+  return getActiveCatalog().find((a) => a.symbol.toUpperCase() === key) ?? ASSET_BY_SYMBOL.get(key);
 }
 
 export function remainingCoins(current: number, target: number): number {
