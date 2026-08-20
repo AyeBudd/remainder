@@ -146,6 +146,7 @@ export function WalletDialog({
             walletAddress: primary,
             walletAmount: row.amount,
             manualAmount: 0,
+            costBasisUsd: null,
           });
         }
       }

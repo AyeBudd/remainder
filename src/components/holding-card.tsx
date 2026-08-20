@@ -1,7 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
-import { formatCoins, formatPercent, formatUsd } from "@/lib/format";
+import { formatCoins, formatPercent, formatSignedPercent, formatSignedUsd, formatUsd } from "@/lib/format";
+import { unrealizedPnl } from "@/lib/pnl";
 import type { DcaPlan, Holding } from "@/lib/types";
 import { Change24 } from "@/components/change-24";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +33,7 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
   const currentUsd = price != null ? holding.currentAmount * price : null;
   const remainUsd = price != null ? remain * price : null;
   const met = remain <= 0;
+  const pnl = unrealizedPnl(holding.currentAmount, holding.costBasisUsd, price);
   const surplusUsd =
     met && currentUsd != null && price != null
       ? currentUsd - holding.targetAmount * price
@@ -140,6 +142,14 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {formatUsd(currentUsd, { precise: true })} held
               {price != null ? ` at ${formatUsd(price, { precise: true })}` : ""}
+            </p>
+          )}
+          {pnl && (
+            <p
+              className={`mt-1 font-mono text-sm tabular-nums ${pnl.usd >= 0 ? "text-success" : "text-destructive"}`}
+            >
+              {formatSignedUsd(pnl.usd, { precise: true })}
+              {pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""}
             </p>
           )}
         </div>

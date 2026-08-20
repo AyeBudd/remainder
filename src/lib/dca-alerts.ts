@@ -98,6 +98,7 @@ export async function runDcaAlerts(): Promise<{ checked: number; mailed: number;
       walletAddress: row.wallet_address,
       walletAmount: 0,
       manualAmount: num(row.current_amount),
+      costBasisUsd: null,
     }));
     const plans: DcaPlan[] = planRows.map((row) => ({
       id: String(row.id),

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpDown, Check, Plus, RefreshCw, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
-import { formatPercent, formatUpdated, formatUsd } from "@/lib/format";
+import { formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
+import { unrealizedPnl } from "@/lib/pnl";
 import {
   HOLDING_SORTS,
   readHoldingSort,
@@ -55,6 +56,12 @@ export function Dashboard() {
     portfolio.ensureBaselines(prices);
   }, [holdings, prices, portfolio.plans, portfolio.ensureBaselines]);
 
+  useEffect(() => {
+    if (!holdings.length) return;
+    if (Object.keys(prices).length < 1) return;
+    portfolio.ensureCostBasis(prices);
+  }, [holdings, prices, portfolio.ensureCostBasis]);
+
   const chooseSort = (next: HoldingSort) => {
     setSort(next);
     writeHoldingSort(next);
@@ -65,6 +72,8 @@ export function Dashboard() {
     let targetUsd = 0;
     let remainUsd = 0;
     let priced = 0;
+    let costUsd = 0;
+    let pnlKnown = 0;
     const slices: { id: string; symbol: string; remainUsd: number }[] = [];
     for (const h of holdings) {
       const price = prices[h.coingeckoId];
@@ -76,24 +85,36 @@ export function Dashboard() {
       const gap = remain * price;
       remainUsd += gap;
       if (gap > 0) slices.push({ id: h.id, symbol: h.symbol, remainUsd: gap });
+      const pnl = unrealizedPnl(h.currentAmount, h.costBasisUsd, price);
+      if (pnl) {
+        costUsd += pnl.cost;
+        pnlKnown += 1;
+      }
     }
     const fill = targetUsd > 0 ? currentUsd / targetUsd : 0;
-    return { currentUsd, targetUsd, remainUsd, priced, fill, slices };
+    const pnlUsd = pnlKnown > 0 ? currentUsd - costUsd : null;
+    const pnlRatio = pnlUsd != null && costUsd > 0 ? pnlUsd / costUsd : null;
+    return { currentUsd, targetUsd, remainUsd, priced, fill, slices, pnlUsd, pnlRatio, pnlKnown };
   }, [holdings, prices]);
 
   const saveHolding = async (input: HoldingInput, id?: string) => {
-    if (id) await portfolio.update(id, input);
-    else await portfolio.add(input);
+    const markPrice = prices[input.coingeckoId];
+    const payload = markPrice != null ? { ...input, markPrice } : input;
+    if (id) await portfolio.update(id, payload);
+    else await portfolio.add(payload);
   };
 
   const applyWallet = async (
     updates: { id: string; walletAmount: number; walletAddress: string }[],
   ) => {
     for (const u of updates) {
+      const holding = holdings.find((h) => h.id === u.id);
+      const markPrice = holding ? prices[holding.coingeckoId] : undefined;
       await portfolio.update(u.id, {
         walletAmount: u.walletAmount,
         walletAddress: u.walletAddress,
         source: u.walletAmount > 0 ? "wallet" : "manual",
+        markPrice,
       });
     }
   };
@@ -136,15 +157,24 @@ export function Dashboard() {
             {formatPercent(totals.fill)} filled
           </p>
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <MiniStat label="Held" value={totals.priced > 0 ? formatUsd(totals.currentUsd) : "—"} />
           <MiniStat label="Target value" value={totals.priced > 0 ? formatUsd(totals.targetUsd) : "—"} />
           <MiniStat
-            className="col-span-2 sm:col-span-1"
-            label="Assets"
-            value={String(holdings.length)}
+            label="Est. P/L"
+            value={totals.pnlUsd != null ? formatSignedUsd(totals.pnlUsd) : "—"}
+            valueClassName={
+              totals.pnlUsd == null ? undefined : totals.pnlUsd >= 0 ? "text-success" : "text-destructive"
+            }
+            hint={totals.pnlRatio != null ? formatSignedPercent(totals.pnlRatio) : "Marks on save"}
           />
+          <MiniStat label="Assets" value={String(holdings.length)} />
         </div>
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          Estimated P/L books each increase in current holdings at the live price when you save or refresh a
+          wallet. CEX fills are not imported. Bags already on the ledger were marked at the first live price after
+          this shipped.
+        </p>
         {totals.slices.length > 0 && (
           <div className="mt-5">
             <div className="flex h-2 overflow-hidden rounded-full bg-secondary">
@@ -313,7 +343,9 @@ export function Dashboard() {
         onAddWallet={(address) => portfolio.addWallet(address).then(() => undefined)}
         onRemoveWallet={(address) => portfolio.removeWallet(address).then(() => undefined)}
         onApply={applyWallet}
-        onAddFromWallet={(input) => portfolio.add(input).then(() => undefined)}
+        onAddFromWallet={(input) =>
+          portfolio.add({ ...input, markPrice: prices[input.coingeckoId] }).then(() => undefined)
+        }
       />
     </>
   );
@@ -323,15 +355,20 @@ function MiniStat({
   label,
   value,
   className,
+  valueClassName,
+  hint,
 }: {
   label: string;
   value: string;
   className?: string;
+  valueClassName?: string;
+  hint?: string;
 }) {
   return (
     <div className={className}>
       <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 font-serif text-2xl tracking-tight tabular-nums">{value}</p>
+      <p className={`mt-1 font-serif text-2xl tracking-tight tabular-nums ${valueClassName ?? ""}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   upsertDcaPlan,
 } from "@/lib/holdings";
 import { captureBaseline, hasBaseline } from "@/lib/dca";
+import { rollCostBasis } from "@/lib/pnl";
 import type { DcaPlan, DcaPlanInput, Holding, HoldingInput, LinkedWallet, PriceMap } from "@/lib/types";
 import { addUserWallet, listUserWallets, removeUserWallet } from "@/lib/user-wallets";
 import { normalizeAddress } from "@/lib/wallet";
@@ -42,6 +43,7 @@ function makeSample(): LocalState {
       walletAddress: null,
       walletAmount: 0,
       manualAmount: 0.37,
+      costBasisUsd: null,
     },
     {
       id: "sample-eth",
@@ -54,6 +56,7 @@ function makeSample(): LocalState {
       walletAddress: null,
       walletAmount: 0,
       manualAmount: 8.4,
+      costBasisUsd: null,
     },
     {
       id: "sample-sol",
@@ -66,6 +69,7 @@ function makeSample(): LocalState {
       walletAddress: null,
       walletAmount: 0,
       manualAmount: 64,
+      costBasisUsd: null,
     },
   ];
   const plans: DcaPlan[] = [
@@ -92,6 +96,7 @@ function readLocal(): LocalState {
         ...h,
         walletAmount: h.walletAmount ?? (h.source === "wallet" ? h.currentAmount : 0),
         manualAmount: h.manualAmount ?? (h.source === "wallet" ? 0 : h.currentAmount),
+        costBasisUsd: h.costBasisUsd ?? null,
       })),
       plans: parsed.plans,
     };
@@ -190,6 +195,9 @@ export function usePortfolio() {
       id: crypto.randomUUID(),
       walletAmount: input.walletAmount ?? 0,
       manualAmount: input.manualAmount ?? input.currentAmount,
+      costBasisUsd:
+        input.costBasisUsd ??
+        (input.markPrice && input.markPrice > 0 ? input.currentAmount * input.markPrice : null),
     };
     setHoldings((prev) => {
       const next = [...(prev ?? []), created];
@@ -221,7 +229,12 @@ export function usePortfolio() {
             : patch.currentAmount ?? walletAmount + manualAmount;
         const source =
           walletAmount > 0 && manualAmount > 0 ? "mixed" : walletAmount > 0 ? "wallet" : "manual";
-        updated = { ...h, ...patch, walletAmount, manualAmount, currentAmount, source };
+        const costBasisUsd = patch.markPrice
+          ? rollCostBasis(h.currentAmount, patch.costBasisUsd !== undefined ? patch.costBasisUsd : h.costBasisUsd, currentAmount, patch.markPrice)
+          : patch.costBasisUsd !== undefined
+            ? patch.costBasisUsd
+            : h.costBasisUsd;
+        updated = { ...h, ...patch, walletAmount, manualAmount, currentAmount, source, costBasisUsd };
         return updated;
       });
       persistGuest(next, plans);
@@ -279,6 +292,23 @@ export function usePortfolio() {
         if (!user) persistGuest(holdings ?? [], next);
         return next;
       });
+    },
+    [holdings, user],
+  );
+
+  const ensureCostBasis = useCallback(
+    (prices: PriceMap) => {
+      const pending = holdings.filter(
+        (h) => h.costBasisUsd == null && prices[h.coingeckoId] != null && h.currentAmount > 0,
+      );
+      if (pending.length === 0) return;
+      void (async () => {
+        for (const h of pending) {
+          const price = prices[h.coingeckoId];
+          if (price == null) continue;
+          await update(h.id, { costBasisUsd: h.currentAmount * price, markPrice: price });
+        }
+      })();
     },
     [holdings, user],
   );
@@ -341,6 +371,7 @@ export function usePortfolio() {
     removeWallet,
     savePlan,
     ensureBaselines,
+    ensureCostBasis,
     removePlan,
     loadSample,
     reload,

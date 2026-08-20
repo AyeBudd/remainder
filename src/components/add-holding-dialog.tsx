@@ -122,6 +122,7 @@ export function AddHoldingDialog({
           walletAddress: editing?.walletAddress ?? null,
           walletAmount: editing?.walletAmount ?? 0,
           manualAmount: Math.max(0, currentAmount - (editing?.walletAmount ?? 0)),
+          costBasisUsd: editing?.costBasisUsd ?? null,
         },
         editing?.id,
       );

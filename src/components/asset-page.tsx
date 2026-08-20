@@ -8,9 +8,11 @@ import {
   formatCompact,
   formatPercent,
   formatSignedPercent,
+  formatSignedUsd,
   formatUsd,
   formatUsdCompact,
 } from "@/lib/format";
+import { unrealizedPnl } from "@/lib/pnl";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { Change24 } from "@/components/change-24";
 import { PriceChart } from "@/components/price-chart";
@@ -218,13 +220,14 @@ function HoldingStrip({
   holding,
   price,
 }: {
-  holding: { currentAmount: number; targetAmount: number; symbol: string };
+  holding: { currentAmount: number; targetAmount: number; symbol: string; costBasisUsd: number | null };
   price: number | null;
 }) {
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
   const ratio = fillRatio(holding.currentAmount, holding.targetAmount);
   const remainUsd = price != null ? remain * price : null;
   const met = remain <= 0;
+  const pnl = unrealizedPnl(holding.currentAmount, holding.costBasisUsd, price ?? undefined);
   return (
     <section className="mt-6 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
       <p className="text-xs tracking-wide text-muted-foreground uppercase">Your target</p>
@@ -242,6 +245,12 @@ function HoldingStrip({
         indicatorClassName={met ? "bg-success" : undefined}
         value={Math.min(100, ratio * 100)}
       />
+      {pnl && (
+        <p className={`mt-3 font-mono text-sm tabular-nums ${pnl.usd >= 0 ? "text-success" : "text-destructive"}`}>
+          Est. P/L {formatSignedUsd(pnl.usd, { precise: true })}
+          {pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""}
+        </p>
+      )}
     </section>
   );
 }

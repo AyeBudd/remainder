@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { captureBaseline, defaultTargetDate, frequencyNoun, hasBaseline, quoteDca, sameSchedule } from "@/lib/dca";
 import { DcaChart } from "@/components/dca-chart";
-import { formatCoins, formatUsd, parseAmount } from "@/lib/format";
+import { formatCoins, formatSignedPercent, formatSignedUsd, formatUsd, parseAmount } from "@/lib/format";
+import { planToDatePnl, unrealizedPnl } from "@/lib/pnl";
 import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -207,6 +208,10 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
         </div>
       )}
 
+      {existing && (
+        <PlanPnlRow holding={holding} plan={existing} price={prices[holding.coingeckoId]} />
+      )}
+
       {quote && quote.series.length > 1 && (
         <DcaChart series={quote.series} milestones={quote.milestones} symbol={holding.symbol} />
       )}
@@ -234,11 +239,57 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function PlanPnlRow({
+  holding,
+  plan,
+  price,
+}: {
+  holding: Holding;
+  plan: DcaPlan;
+  price?: number;
+}) {
+  const booked = unrealizedPnl(holding.currentAmount, holding.costBasisUsd, price);
+  const scheduled = planToDatePnl(holding, plan, price);
+  if (!booked && !scheduled) return null;
+  return (
+    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      {booked && (
+        <Stat
+          label="Booked P/L"
+          value={formatSignedUsd(booked.usd)}
+          hint={booked.ratio != null ? `${formatSignedPercent(booked.ratio)} vs cost` : "From holding updates"}
+          tone={booked.usd}
+        />
+      )}
+      {scheduled && (
+        <Stat
+          label="If on schedule"
+          value={formatSignedUsd(scheduled.usd)}
+          hint={`${scheduled.buys} buys booked at plan price`}
+          tone={scheduled.usd}
+        />
+      )}
+    </div>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone?: number;
+}) {
+  const color =
+    tone == null ? "" : tone > 0 ? " text-success" : tone < 0 ? " text-destructive" : "";
   return (
     <div className="rounded-lg bg-secondary/70 px-4 py-3">
       <p className="text-xs tracking-wide text-muted-foreground uppercase">{label}</p>
-      <p className="mt-1 font-serif text-2xl tracking-tight tabular-nums">{value}</p>
+      <p className={`mt-1 font-serif text-2xl tracking-tight tabular-nums${color}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
   );

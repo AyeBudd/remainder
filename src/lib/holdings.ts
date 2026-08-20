@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
 import type { DcaFrequency, DcaPlan, Holding, HoldingInput, HoldingSource } from "./types";
+import { rollCostBasis } from "@/lib/pnl";
 
 function num(v: string | number | null | undefined): number {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -22,6 +23,7 @@ type HoldingRow = {
   wallet_address: string | null;
   wallet_amount?: string | number | null;
   manual_amount?: string | number | null;
+  cost_basis_usd?: string | number | null;
 };
 
 type PlanRow = {
@@ -59,6 +61,7 @@ function toHolding(row: HoldingRow): Holding {
     walletAddress: row.wallet_address,
     walletAmount,
     manualAmount,
+    costBasisUsd: row.cost_basis_usd == null ? null : num(row.cost_basis_usd),
   };
 }
 
@@ -129,6 +132,8 @@ const holdingInput = z.object({
   walletAddress: z.string().nullable().optional(),
   walletAmount: z.number().min(0).optional(),
   manualAmount: z.number().min(0).optional(),
+  costBasisUsd: z.number().min(0).nullable().optional(),
+  markPrice: z.number().positive().optional(),
 });
 
 const holdingPatch = z.object({
@@ -139,6 +144,8 @@ const holdingPatch = z.object({
   walletAddress: z.string().nullable().optional(),
   walletAmount: z.number().min(0).optional(),
   manualAmount: z.number().min(0).optional(),
+  costBasisUsd: z.number().min(0).nullable().optional(),
+  markPrice: z.number().positive().optional(),
 });
 
 const planInput = z.object({
@@ -158,7 +165,7 @@ export const listHoldings = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     const rows = await sql<HoldingRow>`
-      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
+      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd
       from holdings
       where user_id = ${context.userId}
       order by id asc
@@ -186,8 +193,11 @@ export const createHolding = createServerFn({ method: "POST" })
     const walletAmount = data.walletAmount ?? (data.source === "wallet" || data.source === "mixed" ? data.currentAmount : 0);
     const manualAmount = data.manualAmount ?? Math.max(0, data.currentAmount - walletAmount);
     const source = sourceOf(walletAmount, manualAmount);
+    const costBasisUsd =
+      data.costBasisUsd ??
+      (data.markPrice && data.markPrice > 0 ? data.currentAmount * data.markPrice : null);
     const rows = await sql<HoldingRow>`
-      insert into holdings (user_id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount)
+      insert into holdings (user_id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd)
       values (
         ${context.userId},
         ${data.symbol.toUpperCase()},
@@ -198,9 +208,10 @@ export const createHolding = createServerFn({ method: "POST" })
         ${source},
         ${data.walletAddress ?? null},
         ${walletAmount},
-        ${manualAmount}
+        ${manualAmount},
+        ${costBasisUsd}
       )
-      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
+      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd
     `;
     const created = rows[0];
     if (!created) throw new Error("Failed to create holding");
@@ -214,7 +225,7 @@ export const updateHolding = createServerFn({ method: "POST" })
     const sql = await getSql();
     const id = Number(data.id);
     const existing = await sql<HoldingRow>`
-      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
+      select id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd
       from holdings
       where id = ${id} and user_id = ${context.userId}
     `;
@@ -235,6 +246,10 @@ export const updateHolding = createServerFn({ method: "POST" })
     const source = sourceOf(walletAmount, manualAmount);
     const walletAddress =
       data.walletAddress === undefined ? row.wallet_address : data.walletAddress;
+    let costBasisUsd = data.costBasisUsd !== undefined ? data.costBasisUsd : prev.costBasisUsd;
+    if (data.markPrice && data.markPrice > 0) {
+      costBasisUsd = rollCostBasis(prev.currentAmount, costBasisUsd, currentAmount, data.markPrice);
+    }
     const updated = await sql<HoldingRow>`
       update holdings
       set target_amount = ${targetAmount},
@@ -243,9 +258,10 @@ export const updateHolding = createServerFn({ method: "POST" })
           wallet_address = ${walletAddress},
           wallet_amount = ${walletAmount},
           manual_amount = ${manualAmount},
+          cost_basis_usd = ${costBasisUsd},
           updated_at = now()
       where id = ${id} and user_id = ${context.userId}
-      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount
+      returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd
     `;
     const next = updated[0];
     if (!next) throw new Error("Failed to update holding");

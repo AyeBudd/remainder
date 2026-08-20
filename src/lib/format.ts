@@ -91,3 +91,11 @@ export function formatUsdCompact(value: number): string {
     maximumFractionDigits: 1,
   }).format(value);
 }
+
+export function formatSignedUsd(value: number, opts?: { compact?: boolean; precise?: boolean }): string {
+  if (!Number.isFinite(value)) return "—";
+  const formatted = formatUsd(Math.abs(value), opts);
+  if (value > 0.004) return `+${formatted}`;
+  if (value < -0.004) return `−${formatted}`;
+  return formatUsd(0, opts);
+}
