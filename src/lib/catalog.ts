@@ -7,6 +7,8 @@ import {
 } from "./assets";
 import { BAKED_TOP_100 } from "@/lib/baked-assets";
 
+export const MARKET_TOP = 250;
+
 export type MarketPayload = {
   assets: Asset[];
   prices: Record<string, number>;
@@ -57,7 +59,7 @@ function toAsset(row: {
 
 async function fromCoinGecko(force = false): Promise<MarketPayload> {
   const url =
-    "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1&sparkline=false" +
+    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${MARKET_TOP}&page=1&sparkline=false` +
     (force ? `&t=${Date.now()}` : "");
   const res = await fetch(url, {
     headers: { accept: "application/json" },
@@ -95,7 +97,7 @@ async function fromCoinGecko(force = false): Promise<MarketPayload> {
     if (change != null) changes[asset.coingeckoId] = change;
   });
   return {
-    assets: overlaySeedFromLive(live),
+    assets: overlaySeedFromLive(live.slice(0, MARKET_TOP)),
     prices,
     changes,
     updatedAt: Date.now(),
@@ -104,25 +106,31 @@ async function fromCoinGecko(force = false): Promise<MarketPayload> {
 }
 
 async function fromCoinlore(force = false): Promise<MarketPayload> {
-  const res = await fetch(
-    "https://api.coinlore.net/api/tickers/?start=0&limit=100" + (force ? `&t=${Date.now()}` : ""),
-    {
-      headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(8000),
-    },
+  const pages = [0, 100, 200];
+  const chunks = await Promise.all(
+    pages.map(async (start) => {
+      const res = await fetch(
+        `https://api.coinlore.net/api/tickers/?start=${start}&limit=100` + (force ? `&t=${Date.now()}` : ""),
+        {
+          headers: { accept: "application/json" },
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+      if (!res.ok) throw new Error(`coinlore ${res.status}`);
+      const json = (await res.json()) as {
+        data?: {
+          symbol: string;
+          name: string;
+          nameid: string;
+          rank: number;
+          price_usd: string;
+          percent_change_24h?: string | number;
+        }[];
+      };
+      return json.data ?? [];
+    }),
   );
-  if (!res.ok) throw new Error(`coinlore ${res.status}`);
-  const json = (await res.json()) as {
-    data?: {
-      symbol: string;
-      name: string;
-      nameid: string;
-      rank: number;
-      price_usd: string;
-      percent_change_24h?: string | number;
-    }[];
-  };
-  const rows = json.data ?? [];
+  const rows = chunks.flat();
   if (rows.length < 50) throw new Error("coinlore empty");
   const prices: Record<string, number> = {};
   const changes: Record<string, number> = {};
@@ -146,7 +154,7 @@ async function fromCoinlore(force = false): Promise<MarketPayload> {
     if (change != null) changes[asset.coingeckoId] = change;
   }
   return {
-    assets: overlaySeedFromLive(live),
+    assets: overlaySeedFromLive(live.slice(0, MARKET_TOP)),
     prices,
     changes,
     updatedAt: Date.now(),
@@ -170,7 +178,7 @@ async function fromPaprika(force = false): Promise<MarketPayload> {
     rank: number;
     quotes?: { USD?: { price?: number; percent_change_24h?: number } };
   }[];
-  const top = [...rows].sort((a, b) => (a.rank || 9999) - (b.rank || 9999)).slice(0, 100);
+  const top = [...rows].sort((a, b) => (a.rank || 9999) - (b.rank || 9999)).slice(0, MARKET_TOP);
   if (top.length < 50) throw new Error("paprika empty");
   const prices: Record<string, number> = {};
   const changes: Record<string, number> = {};
@@ -194,7 +202,7 @@ async function fromPaprika(force = false): Promise<MarketPayload> {
     if (change != null) changes[asset.coingeckoId] = change;
   }
   return {
-    assets: overlaySeedFromLive(live),
+    assets: overlaySeedFromLive(live.slice(0, MARKET_TOP)),
     prices,
     changes,
     updatedAt: Date.now(),

@@ -380,9 +380,9 @@ function dialogHtml(){
   return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="a-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="a-title">${d.edit?`Edit ${esc(d.edit.symbol)}`:"Add a target"}</h2>
-    <p class="desc">Pick from the current top 100 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.</p>
+    <p class="desc">Pick from the current top 250 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.</p>
     ${!d.edit?`<div style="margin-top:1rem">
-      <label class="lbl" for="asset-search">Top 100 assets</label>
+      <label class="lbl" for="asset-search">Top 250 assets</label>
       ${!d.custom?`<input id="asset-search" value="${esc(d.query||"")}" placeholder="Search Bitcoin, HYPE, PENGU…" autocomplete="off" />
       <div class="asset-grid" style="margin-top:8px">${shown.map(a=>{
         const on = d.asset?.symbol===a.symbol;

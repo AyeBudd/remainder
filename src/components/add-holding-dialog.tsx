@@ -73,7 +73,7 @@ export function AddHoldingDialog({
         a.coingeckoId.includes(q)
       );
     });
-    return q ? filtered.slice(0, 40) : filtered;
+    return q ? filtered.slice(0, 48) : filtered.slice(0, 48);
   }, [assets, query]);
 
   const submit = async () => {
@@ -136,13 +136,13 @@ export function AddHoldingDialog({
         <DialogHeader>
           <DialogTitle>{editing ? `Edit ${editing.symbol}` : "Add a target"}</DialogTitle>
           <DialogDescription>
-            Pick from the current top 100 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.
+            Pick from the current top 250 by market cap, or add any CoinGecko id. Type to search the full list. Current amount can be typed in or filled from a wallet later.
           </DialogDescription>
         </DialogHeader>
 
         {!editing && (
           <div className="space-y-2">
-            <Label htmlFor="asset-search">Top 100 assets</Label>
+            <Label htmlFor="asset-search">Top 250 assets</Label>
             {!useCustom && (
               <>
                 <Input

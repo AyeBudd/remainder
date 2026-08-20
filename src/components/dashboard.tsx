@@ -187,7 +187,7 @@ export function Dashboard() {
             onClick={() => void refresh(true)}
             disabled={refreshing}
             aria-busy={refreshing}
-            aria-label="Update prices for the top 100"
+            aria-label="Update prices for the top 250"
           >
             <RefreshCw className={refreshing ? "animate-spin" : undefined} />
             {refreshing ? "Updating…" : "Update prices"}
