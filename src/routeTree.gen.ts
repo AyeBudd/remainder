@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as AssetIdRouteImport } from './routes/asset.$id'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiCronDcaAlertsRouteImport } from './routes/api/cron/dca-alerts'
 import { Route as ApiCronNewsletterRouteImport } from './routes/api/cron/newsletter'
@@ -29,6 +30,11 @@ const AccountRoute = AccountRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetIdRoute = AssetIdRouteImport.update({
+  id: '/asset/$id',
+  path: '/asset/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/login': typeof LoginRoute
+  '/asset/$id': typeof AssetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
   '/api/cron/newsletter': typeof ApiCronNewsletterRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/login': typeof LoginRoute
+  '/asset/$id': typeof AssetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
   '/api/cron/newsletter': typeof ApiCronNewsletterRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/account': typeof AccountRoute
   '/login': typeof LoginRoute
+  '/asset/$id': typeof AssetIdRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
   '/api/cron/newsletter': typeof ApiCronNewsletterRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/login'
+    | '/asset/$id'
     | '/api/auth/$'
     | '/api/cron/dca-alerts'
     | '/api/cron/newsletter'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/login'
+    | '/asset/$id'
     | '/api/auth/$'
     | '/api/cron/dca-alerts'
     | '/api/cron/newsletter'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/account'
     | '/login'
+    | '/asset/$id'
     | '/api/auth/$'
     | '/api/cron/dca-alerts'
     | '/api/cron/newsletter'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AccountRoute: typeof AccountRoute
   LoginRoute: typeof LoginRoute
+  AssetIdRoute: typeof AssetIdRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiCronDcaAlertsRoute: typeof ApiCronDcaAlertsRoute
   ApiCronNewsletterRoute: typeof ApiCronNewsletterRoute
@@ -129,6 +142,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/asset/$id': {
+      id: '/asset/$id'
+      path: '/asset/$id'
+      fullPath: '/asset/$id'
+      preLoaderRoute: typeof AssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -159,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AccountRoute: AccountRoute,
   LoginRoute: LoginRoute,
+  AssetIdRoute: AssetIdRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiCronDcaAlertsRoute: ApiCronDcaAlertsRoute,
   ApiCronNewsletterRoute: ApiCronNewsletterRoute,

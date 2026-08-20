@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
 import { formatCoins, formatPercent, formatUsd } from "@/lib/format";
@@ -39,10 +40,17 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
     <article
       className={
         met
-          ? "rounded-xl bg-success/20 p-4 outline outline-1 outline-success/45 sm:p-5"
-          : "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5"
+          ? "relative rounded-xl bg-success/20 p-4 outline outline-1 outline-success/45 transition-colors hover:bg-success/25 sm:p-5"
+          : "relative rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-colors hover:bg-secondary/40 sm:p-5"
       }
     >
+      <Link
+        to="/asset/$id"
+        params={{ id: holding.coingeckoId }}
+        className="absolute inset-0 z-0 rounded-xl"
+        aria-label={`${holding.symbol} market`}
+      />
+      <div className="relative z-10">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-baseline gap-2">
@@ -64,7 +72,12 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label={`Actions for ${holding.symbol}`}>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions for ${holding.symbol}`}
+              onClick={(e) => e.stopPropagation()}
+            >
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
@@ -122,10 +135,20 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             </p>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={onPlan}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="relative z-10"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onPlan();
+          }}
+        >
           <Route />
           Plan path
         </Button>
+      </div>
       </div>
     </article>
   );

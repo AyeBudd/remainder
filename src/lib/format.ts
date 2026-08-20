@@ -73,3 +73,21 @@ export function parseAmount(raw: string): number | null {
   if (!Number.isFinite(n) || n < 0) return null;
   return n;
 }
+
+export function formatCompact(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: value >= 1000 ? 1 : 2,
+  }).format(value);
+}
+
+export function formatUsdCompact(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
