@@ -142,6 +142,14 @@ function stepDate(from: Date, freq: DcaFrequency, n: number): Date {
   }
 }
 
+function parsePlanDate(value: string): Date | null {
+  if (!value) return null;
+  const iso = parseISO(value);
+  if (!Number.isNaN(iso.getTime())) return iso;
+  const fallback = new Date(value);
+  return Number.isNaN(fallback.getTime()) ? null : fallback;
+}
+
 export function quoteDca(
   holding: Holding,
   plan: Pick<DcaPlan, "targetDate" | "frequency" | "assumedPrice">,
@@ -157,8 +165,8 @@ export function quoteDca(
         ? live
         : null;
   const remainingUsd = priceUsed != null ? remain * priceUsed : null;
-  const target = parseISO(plan.targetDate);
-  const pastDue = !isAfter(startOfDay(target), startOfDay(now));
+  const target = parsePlanDate(plan.targetDate);
+  const pastDue = !target || !isAfter(startOfDay(target), startOfDay(now));
   const alreadyMet = remain <= 0;
 
   if (alreadyMet || pastDue) {

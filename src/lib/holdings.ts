@@ -44,12 +44,24 @@ function toHolding(row: HoldingRow): Holding {
   };
 }
 
+function dateOnly(value: unknown): string {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toISOString().slice(0, 10);
+  }
+  const s = String(value ?? "");
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const parsed = new Date(s);
+  if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+  return "";
+}
+
 function toPlan(row: PlanRow): DcaPlan {
   const base = parseBaseline(row.baseline);
   return {
     id: String(row.id),
     holdingId: String(row.holding_id),
-    targetDate: String(row.target_date).slice(0, 10),
+    targetDate: dateOnly(row.target_date),
     frequency: row.frequency as DcaFrequency,
     assumedPrice: row.assumed_price == null ? null : num(row.assumed_price),
     ...base,

@@ -210,6 +210,13 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
       {quote && quote.series.length > 1 && (
         <DcaChart series={quote.series} milestones={quote.milestones} symbol={holding.symbol} />
       )}
+      {quote && quote.series.length <= 1 && !quote.alreadyMet && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          {quote.pastDue
+            ? "Pick a date after today to plot the path."
+            : "Set a target date to see the DCA graph."}
+        </p>
+      )}
 
       {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
 
