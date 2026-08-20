@@ -152,6 +152,11 @@ function formatSignedPct(r){
   const p = r*100;
   return (p>0?"+":"") + p.toFixed(Math.abs(p)>=10?0:1) + "%";
 }
+function changeHtml(r){
+  if (!Number.isFinite(r)) return "";
+  const cls = r>0 ? "chg chg-up" : r<0 ? "chg chg-down" : "chg";
+  return `<p class="${cls}" title="Past 24 hours">${esc(formatSignedPct(r))} <span>24h</span></p>`;
+}
 function cycleFromHeight(height){
   const now = Date.now();
   const tip = height > LAST_HALVING_BLOCK ? height : LAST_HALVING_BLOCK + Math.floor((now-LAST_HALVING_AT)/600000);
@@ -181,12 +186,14 @@ async function loadBtcTracker(force){
   if (force) render();
   try {
     let price = state.prices.bitcoin || null;
+    let change24 = Number.isFinite(state.changes && state.changes.bitcoin) ? state.changes.bitcoin : null;
     let ath = BAKED_ATH;
     try {
       const res = await fetch("https://api.coinpaprika.com/v1/tickers/btc-bitcoin");
       if (res.ok) {
         const usd = (await res.json()).quotes?.USD || {};
         if (Number(usd.price) > 0) price = Number(usd.price);
+        if (Number.isFinite(Number(usd.percent_change_24h))) change24 = Number(usd.percent_change_24h) / 100;
         if (Number(usd.ath_price) > 0) {
           const at = Date.parse(usd.ath_date);
           ath = { price: Number(usd.ath_price), at: Number.isFinite(at) ? at : BAKED_ATH.at };
@@ -226,10 +233,10 @@ async function loadBtcTracker(force){
         if (n > 800000) { height = n; break; }
       } catch {}
     }
-    state.btc = { price, ath, cycleLow, cycle: cycleFromHeight(height), updatedAt: Date.now() };
+    state.btc = { price, change24, ath, cycleLow, cycle: cycleFromHeight(height), updatedAt: Date.now() };
   } catch {
     if (!state.btc) {
-      state.btc = { price: state.prices.bitcoin || null, ath: BAKED_ATH, cycleLow: BAKED_CYCLE_LOW, cycle: cycleFromHeight(null), updatedAt: Date.now() };
+      state.btc = { price: state.prices.bitcoin || null, change24: null, ath: BAKED_ATH, cycleLow: BAKED_CYCLE_LOW, cycle: cycleFromHeight(null), updatedAt: Date.now() };
     }
   } finally {
     state.btcBusy = false;
@@ -276,6 +283,7 @@ function draftFor(h){
 const state = {
   ...load(),
   prices: {},
+  changes: {},
   priceOk: false,
   priceAt: 0,
   priceBusy: false,
@@ -319,6 +327,7 @@ function applyCatalog(rows){
   const seen = new Set();
   const next = [];
   const prices = {};
+  const changes = {};
   for (const row of rows) {
     const symbol = String(row.symbol || "").toUpperCase();
     if (!symbol || seen.has(symbol)) continue;
@@ -329,10 +338,17 @@ function applyCatalog(rows){
     const dec = baked?.decimals ?? (price >= 1000 ? 6 : price >= 10 ? 4 : price >= 0.1 ? 3 : price >= 0.01 ? 2 : 0);
     next.push({ symbol, name: row.name || baked?.name || symbol, id, decimals: dec, rank: Number(row.rank) || next.length + 1, pair: baked?.pair });
     if (price > 0) prices[id] = price;
+    const chg = Number(row.percent_change_24h ?? (row.quotes && row.quotes.USD && row.quotes.USD.percent_change_24h));
+    if (Number.isFinite(chg)) changes[id] = chg / 100;
   }
   if (next.length < 50) return false;
   ASSETS = next;
-  if (Object.keys(prices).length >= 3) { state.prices = prices; state.priceOk = true; state.priceAt = Date.now(); }
+  if (Object.keys(prices).length >= 3) {
+    state.prices = prices;
+    state.changes = Object.assign({}, state.changes, changes);
+    state.priceOk = true;
+    state.priceAt = Date.now();
+  }
   return true;
 }
 

@@ -29,7 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function Dashboard() {
   const portfolio = usePortfolio();
-  const { prices, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
+  const { prices, changes, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
   const [addOpen, setAddOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -253,6 +253,7 @@ export function Dashboard() {
                 holding={holding}
                 plan={portfolio.plans.find((p) => p.holdingId === holding.id)}
                 price={prices[holding.coingeckoId]}
+                change={changes?.[holding.coingeckoId]}
                 onEdit={() => setEditing(holding)}
                 onPlan={() => {
                   setDcaId(holding.id);

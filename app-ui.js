@@ -189,7 +189,10 @@ function btcHtml(){
       <p class="kicker">Bitcoin</p>
       <div class="hero-row">
         <h1>${price!=null ? esc(formatUsd(price)) : "—"}</h1>
-        <p class="fill">${fromAth!=null ? esc(formatSignedPct(fromAth))+" vs ATH" : "spot"}</p>
+        <div>
+          ${changeHtml(b?.change24 ?? (state.changes && state.changes.bitcoin))}
+          <p class="fill">${fromAth!=null ? esc(formatSignedPct(fromAth))+" vs ATH" : ""}</p>
+        </div>
       </div>
       <div class="price-row">
         <p class="held">${b?.updatedAt ? "Updated "+esc(formatUpdated(b.updatedAt)) : "Fetching…"}</p>
@@ -310,6 +313,7 @@ function cardHtml(h){
     <div class="card-top">
       <div>
         <div class="sym"><h3>${esc(h.symbol)}</h3><span>${esc(h.name)}</span></div>
+        ${changeHtml(state.changes && state.changes[h.idg])}
         <div class="badges">
           <span class="badge ${h.source==="wallet"?"badge-ok":""}">${h.source==="wallet"?"Wallet":"Manual"}</span>
           ${plan?`<span class="badge badge-out">DCA ${esc(plan.frequency)} to ${esc(plan.targetDate)}</span>`:""}

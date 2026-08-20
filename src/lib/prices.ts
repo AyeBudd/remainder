@@ -1,21 +1,29 @@
 import { createServerFn } from "@tanstack/react-start";
-import { ASSETS } from "./assets";
+import { getActiveCatalog, SEED_ASSETS } from "./assets";
+import { loadMarket } from "./catalog";
 
 export type PricePayload = {
   prices: Record<string, number>;
+  changes?: Record<string, number>;
   updatedAt: number;
-  source: "coingecko" | "paprika" | "coinbase" | "binance" | "mixed" | "none";
+  source: "coingecko" | "paprika" | "coinbase" | "binance" | "mixed" | "none" | "coinlore" | "baked";
 };
 
 const CACHE_MS = 45_000;
 let cache: PricePayload | null = null;
+
+function listedAssets() {
+  const catalog = getActiveCatalog();
+  return catalog.length >= 20 ? catalog : SEED_ASSETS;
+}
 
 function hasEnough(prices: Record<string, number>): boolean {
   return Object.keys(prices).length >= 3;
 }
 
 async function fromCoinGecko(): Promise<Record<string, number>> {
-  const ids = [...new Set(ASSETS.map((a) => a.coingeckoId))].join(",");
+  const assets = listedAssets();
+  const ids = [...new Set(assets.map((a) => a.coingeckoId))].join(",");
   const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`;
   const res = await fetch(url, {
     headers: { accept: "application/json" },
@@ -24,7 +32,7 @@ async function fromCoinGecko(): Promise<Record<string, number>> {
   if (!res.ok) throw new Error(`coingecko ${res.status}`);
   const json = (await res.json()) as Record<string, { usd?: number }>;
   const prices: Record<string, number> = {};
-  for (const asset of ASSETS) {
+  for (const asset of assets) {
     const usd = json[asset.coingeckoId]?.usd;
     if (typeof usd === "number" && usd > 0) prices[asset.coingeckoId] = usd;
   }
@@ -33,20 +41,20 @@ async function fromCoinGecko(): Promise<Record<string, number>> {
 }
 
 async function fromPaprika(): Promise<Record<string, number>> {
+  const assets = listedAssets();
   const res = await fetch("https://api.coinpaprika.com/v1/tickers?quotes=USD", {
     headers: { accept: "application/json" },
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) throw new Error(`paprika ${res.status}`);
   const rows = (await res.json()) as {
-    id: string;
+    symbol: string;
     quotes?: { USD?: { price?: number } };
   }[];
-  const byId = new Map(rows.map((r) => [r.id, r.quotes?.USD?.price]));
+  const bySym = new Map(rows.map((r) => [r.symbol.toUpperCase(), r.quotes?.USD?.price]));
   const prices: Record<string, number> = {};
-  for (const asset of ASSETS) {
-    if (!asset.paprikaId) continue;
-    const usd = byId.get(asset.paprikaId);
+  for (const asset of assets) {
+    const usd = bySym.get(asset.symbol.toUpperCase());
     if (typeof usd === "number" && usd > 0) prices[asset.coingeckoId] = usd;
   }
   if (!hasEnough(prices)) throw new Error("paprika empty");
@@ -54,9 +62,10 @@ async function fromPaprika(): Promise<Record<string, number>> {
 }
 
 async function fromCoinbase(): Promise<Record<string, number>> {
+  const assets = listedAssets();
   const prices: Record<string, number> = {};
   await Promise.all(
-    ASSETS.filter((a) => a.coinbasePair).map(async (asset) => {
+    assets.filter((a) => a.coinbasePair).map(async (asset) => {
       try {
         const res = await fetch(`https://api.coinbase.com/v2/prices/${asset.coinbasePair}/spot`, {
           headers: { accept: "application/json" },
@@ -77,6 +86,7 @@ async function fromCoinbase(): Promise<Record<string, number>> {
 }
 
 async function fromBinance(): Promise<Record<string, number>> {
+  const assets = listedAssets();
   const res = await fetch("https://api.binance.com/api/v3/ticker/price", {
     signal: AbortSignal.timeout(6000),
   });
@@ -84,7 +94,7 @@ async function fromBinance(): Promise<Record<string, number>> {
   const rows = (await res.json()) as { symbol: string; price: string }[];
   const byPair = new Map(rows.map((r) => [r.symbol, Number(r.price)]));
   const prices: Record<string, number> = {};
-  for (const asset of ASSETS) {
+  for (const asset of assets) {
     if (!asset.binancePair) continue;
     const n = byPair.get(asset.binancePair);
     if (typeof n === "number" && n > 0) prices[asset.coingeckoId] = n;
@@ -97,6 +107,19 @@ async function fromBinance(): Promise<Record<string, number>> {
 
 export const getPrices = createServerFn({ method: "GET" }).handler(async (): Promise<PricePayload> => {
   if (cache && Date.now() - cache.updatedAt < CACHE_MS) return cache;
+  try {
+    const market = await loadMarket();
+    if (Object.keys(market.prices).length >= 3) {
+      cache = {
+        prices: market.prices,
+        updatedAt: market.updatedAt,
+        source: market.source === "baked" ? "none" : market.source,
+      };
+      return cache;
+    }
+  } catch {
+    /* fall through to pair venues */
+  }
   const sources: Array<() => Promise<Record<string, number>>> = [
     fromCoinGecko,
     fromPaprika,

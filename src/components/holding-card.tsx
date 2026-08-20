@@ -2,6 +2,7 @@ import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
 import { formatCoins, formatPercent, formatUsd } from "@/lib/format";
 import type { DcaPlan, Holding } from "@/lib/types";
+import { Change24 } from "@/components/change-24";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,12 +18,13 @@ type Props = {
   holding: Holding;
   plan?: DcaPlan;
   price?: number;
+  change?: number;
   onEdit: () => void;
   onPlan: () => void;
   onDelete: () => void;
 };
 
-export function HoldingCard({ holding, plan, price, onEdit, onPlan, onDelete }: Props) {
+export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete }: Props) {
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
   const ratio = fillRatio(holding.currentAmount, holding.targetAmount);
   const currentUsd = price != null ? holding.currentAmount * price : null;
@@ -37,6 +39,7 @@ export function HoldingCard({ holding, plan, price, onEdit, onPlan, onDelete }: 
             <h3 className="font-serif text-2xl tracking-tight">{holding.symbol}</h3>
             <span className="text-sm text-muted-foreground">{holding.name}</span>
           </div>
+          <Change24 change={change} className="mt-1" />
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <Badge variant={holding.source === "wallet" ? "success" : "default"}>
               {holding.source === "wallet" ? "Wallet" : "Manual"}

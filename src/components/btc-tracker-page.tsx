@@ -4,11 +4,12 @@ import { formatDayCount, formatShortDate } from "@/lib/btc-cycle";
 import { loadBtcTracker, type BtcTracker } from "@/lib/btc-tracker";
 import { formatSignedPercent, formatUpdated, formatUsd } from "@/lib/format";
 import { usePrices } from "@/hooks/use-prices";
+import { Change24 } from "@/components/change-24";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function BtcTrackerPage() {
-  const { prices } = usePrices();
+  const { prices, changes } = usePrices();
   const [data, setData] = useState<BtcTracker | null>(null);
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,6 +39,7 @@ export function BtcTrackerPage() {
   }, [load]);
 
   const price = data?.price ?? prices.bitcoin ?? null;
+  const change24 = data?.change24 ?? changes?.bitcoin;
   const fromAth = price != null && data ? price / data.ath.price - 1 : null;
   const fromLow = price != null && data ? price / data.cycleLow.price - 1 : null;
 
@@ -62,9 +64,14 @@ export function BtcTrackerPage() {
           <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
             {price != null ? formatUsd(price) : "—"}
           </h1>
-          <p className="pb-1 font-mono text-sm tabular-nums text-muted-foreground">
-            {fromAth != null ? `${formatSignedPercent(fromAth)} vs ATH` : "spot"}
-          </p>
+          <div className="pb-1">
+            <Change24 change={change24} />
+            {fromAth != null && (
+              <p className="font-mono text-sm tabular-nums text-muted-foreground">
+                {formatSignedPercent(fromAth)} vs ATH
+              </p>
+            )}
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">

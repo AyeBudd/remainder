@@ -9,6 +9,7 @@ export type BtcMark = { price: number; at: number };
 
 export type BtcTracker = {
   price: number | null;
+  change24?: number;
   ath: BtcMark;
   cycleLow: BtcMark;
   cycle: HalvingCycle;
@@ -49,17 +50,19 @@ async function fetchHeight(): Promise<number | null> {
   return null;
 }
 
-async function fetchTicker(): Promise<{ price: number | null; ath: BtcMark }> {
+async function fetchTicker(): Promise<{ price: number | null; change24?: number; ath: BtcMark }> {
   try {
     const json = (await readJson("https://api.coinpaprika.com/v1/tickers/btc-bitcoin")) as {
-      quotes?: { USD?: { price?: number; ath_price?: number; ath_date?: string } };
+      quotes?: { USD?: { price?: number; ath_price?: number; ath_date?: string; percent_change_24h?: number } };
     };
     const usd = json.quotes?.USD;
     const price = Number(usd?.price);
     const athPrice = Number(usd?.ath_price);
     const athAt = usd?.ath_date ? Date.parse(usd.ath_date) : NaN;
+    const changeRaw = Number(usd?.percent_change_24h);
     return {
       price: price > 0 ? price : null,
+      change24: Number.isFinite(changeRaw) ? changeRaw / 100 : undefined,
       ath:
         athPrice > 0
           ? { price: athPrice, at: Number.isFinite(athAt) ? athAt : BAKED_ATH.at }
@@ -104,6 +107,7 @@ export async function loadBtcTracker(force = false): Promise<BtcTracker> {
   const cycleLow = await fetchCycleLow(ticker.ath.at);
   const next: BtcTracker = {
     price: ticker.price,
+    change24: ticker.change24,
     ath: ticker.ath,
     cycleLow,
     cycle: cycleFromHeight(height),
