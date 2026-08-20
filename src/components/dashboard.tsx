@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpDown, Check, Download, Plus, RefreshCw, Upload, Wallet } from "lucide-react";
+import { ArrowUpDown, Check, Download, Plus, RefreshCw, Search, Upload, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
 import { downloadLedgerCsv } from "@/lib/export-ledger";
 import { formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
@@ -25,6 +25,7 @@ import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
 import { WalletDialog } from "@/components/wallet-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,7 @@ export function Dashboard() {
   const [dcaId, setDcaId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [sort, setSort] = useState<HoldingSort>(() => readHoldingSort());
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 15_000);
@@ -53,10 +55,17 @@ export function Dashboard() {
   }, []);
 
   const holdings = portfolio.holdings;
-  const visibleHoldings = useMemo(
-    () => sortHoldings(holdings, prices, sort),
-    [holdings, prices, sort],
-  );
+  const visibleHoldings = useMemo(() => {
+    const sorted = sortHoldings(holdings, prices, sort);
+    const q = query.trim().toLowerCase();
+    if (!q) return sorted;
+    return sorted.filter(
+      (h) =>
+        h.symbol.toLowerCase().includes(q) ||
+        h.name.toLowerCase().includes(q) ||
+        h.coingeckoId.toLowerCase().includes(q),
+    );
+  }, [holdings, prices, sort, query]);
 
   useEffect(() => {
     if (!holdings.length || !portfolio.plans.length) return;
@@ -319,6 +328,19 @@ export function Dashboard() {
           </div>
         </div>
 
+        {holdings.length > 1 && (
+          <div className="relative mt-4 max-w-sm">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search bags — AVAX, solana…"
+              aria-label="Search holdings"
+              className="pl-9"
+            />
+          </div>
+        )}
+
         <DcaNotices holdings={holdings} plans={portfolio.plans} prices={prices} />
 
         {holdings.length === 0 ? (
@@ -334,6 +356,10 @@ export function Dashboard() {
                   }
             }
           />
+        ) : visibleHoldings.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No bags match “{query.trim()}”. Clear search to see the full list.
+          </p>
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {visibleHoldings.map((holding) => (
