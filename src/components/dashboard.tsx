@@ -1,8 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { Plus, Wallet } from "lucide-react";
+import { ArrowUpDown, Check, Plus, RefreshCw, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
-import { formatPercent, formatUsd } from "@/lib/format";
+import { formatPercent, formatUpdated, formatUsd } from "@/lib/format";
+import {
+  HOLDING_SORTS,
+  readHoldingSort,
+  sortHoldings,
+  writeHoldingSort,
+  type HoldingSort,
+} from "@/lib/sort-holdings";
 import type { Holding, HoldingInput } from "@/lib/types";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
@@ -12,17 +19,40 @@ import { HoldingCard } from "@/components/holding-card";
 import { SiteHeader } from "@/components/site-header";
 import { WalletDialog } from "@/components/wallet-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function Dashboard() {
   const portfolio = usePortfolio();
-  const { prices, status: priceStatus } = usePrices();
+  const { prices, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
   const [addOpen, setAddOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
   const [dcaId, setDcaId] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [sort, setSort] = useState<HoldingSort>(() => readHoldingSort());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const holdings = portfolio.holdings;
+  const visibleHoldings = useMemo(
+    () => sortHoldings(holdings, prices, sort),
+    [holdings, prices, sort],
+  );
+
+  const chooseSort = (next: HoldingSort) => {
+    setSort(next);
+    writeHoldingSort(next);
+  };
 
   const totals = useMemo(() => {
     let currentUsd = 0;
@@ -143,12 +173,61 @@ export function Dashboard() {
             Live prices are unavailable. Coin amounts and remaining units still update.
           </p>
         )}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            {priceStatus === "loading" && !updatedAt
+              ? "Fetching live prices…"
+              : updatedAt
+                ? `Prices updated ${formatUpdated(updatedAt, now)} · auto every minute`
+                : "Prices pending"}
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => void refresh(true)}
+            disabled={refreshing}
+            aria-busy={refreshing}
+            aria-label="Update prices for the top 100"
+          >
+            <RefreshCw className={refreshing ? "animate-spin" : undefined} />
+            {refreshing ? "Updating…" : "Update prices"}
+          </Button>
+        </div>
       </section>
 
       <section className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-serif text-2xl tracking-tight">Holdings</h2>
           <div className="flex flex-wrap gap-2">
+            {holdings.length > 1 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" aria-label="Sort targets">
+                    <ArrowUpDown />
+                    Sort
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-56">
+                  {HOLDING_SORTS.map((option, i) => {
+                    const prev = HOLDING_SORTS[i - 1];
+                    const showGroup = option.group !== "default" && option.group !== prev?.group;
+                    return (
+                      <div key={option.id}>
+                        {showGroup && (
+                          <>
+                            {i > 1 && <DropdownMenuSeparator />}
+                            <div className="px-3 py-1.5 text-xs text-muted-foreground">{option.group}</div>
+                          </>
+                        )}
+                        <DropdownMenuItem onSelect={() => chooseSort(option.id)}>
+                          <Check className={sort === option.id ? "opacity-100" : "opacity-0"} />
+                          {option.label}
+                        </DropdownMenuItem>
+                      </div>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button variant="outline" onClick={() => setWalletOpen(true)}>
               <Wallet />
               Wallet
@@ -174,7 +253,7 @@ export function Dashboard() {
           />
         ) : (
           <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {holdings.map((holding) => (
+            {visibleHoldings.map((holding) => (
               <HoldingCard
                 key={holding.id}
                 holding={holding}
@@ -218,6 +297,7 @@ export function Dashboard() {
           }
         }}
         existingSymbols={holdings.map((h) => h.symbol)}
+        assets={assets}
         editing={editing}
         onSave={saveHolding}
       />
