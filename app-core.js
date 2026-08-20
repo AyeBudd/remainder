@@ -615,10 +615,8 @@ function chartSvg(series, symbol, milestones){
   const py = v => pt + (1-((v-min)/span))*(h-pt-pb);
   const line = xs.map((x,i)=> `${i?"L":"M"}${x.toFixed(1)},${py(ys[i]).toFixed(1)}`).join(" ");
   const area = `${line} L${xs[xs.length-1].toFixed(1)},${h-pb} L${xs[0].toFixed(1)},${h-pb} Z`;
-  const keep = new Set([0, series.length-1]);
-  series.forEach((s,i)=>{ if (s.milestone) keep.add(i); });
-  const stepN = series.length <= 20 ? 1 : Math.ceil((series.length-1)/12);
-  for (let i=0;i<series.length;i+=stepN) keep.add(i);
+  const keep = [];
+  series.forEach((s,i)=>{ if (s.milestone) keep.push(i); });
   const pts = series.map((s,i)=>({
     x: (xs[i]/w)*100,
     y: (py(s.amount)/h)*100,

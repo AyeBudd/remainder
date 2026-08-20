@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { chartDots, type DcaMilestone, type DcaPoint } from "@/lib/dca";
+import { type DcaMilestone, type DcaPoint } from "@/lib/dca";
 import { formatCoins, formatPercent, formatUsd } from "@/lib/format";
 
 type Props = {
@@ -19,7 +19,7 @@ type Props = {
 };
 
 export function DcaChart({ series, milestones, symbol }: Props) {
-  const dots = chartDots(series);
+  const dots = series.filter((p) => p.milestone != null);
   const ticks = [
     series[0]?.date,
     ...milestones.map((m) => m.date),
@@ -106,15 +106,13 @@ export function DcaChart({ series, milestones, symbol }: Props) {
   );
 }
 
-function HoldDot(props: { cx?: number; cy?: number; payload?: DcaPoint }) {
-  const { cx, cy, payload } = props;
+function HoldDot(props: { cx?: number; cy?: number }) {
+  const { cx, cy } = props;
   if (cx == null || cy == null) return null;
-  const mark = payload?.milestone;
-  const r = mark ? 5 : 3;
   return (
     <g>
-      {mark ? <circle cx={cx} cy={cy} r={r + 4} fill="var(--color-foreground)" fillOpacity={0.16} /> : null}
-      <circle cx={cx} cy={cy} r={r} fill="var(--color-foreground)" />
+      <circle cx={cx} cy={cy} r={9} fill="var(--color-foreground)" fillOpacity={0.16} />
+      <circle cx={cx} cy={cy} r={5} fill="var(--color-foreground)" />
     </g>
   );
 }

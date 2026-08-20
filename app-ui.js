@@ -482,7 +482,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && state.navOpen) { state.navOpen = false; render(); }
 });
 
-document.addEventListener("mousemove", (e) => {
+function paintDcaTip(e){
   const plot = e.target && e.target.closest && e.target.closest(".dca-plot");
   const open = document.querySelectorAll(".dca-tip");
   if (!plot) { open.forEach((t) => { t.hidden = true; }); return; }
@@ -507,7 +507,9 @@ document.addEventListener("mousemove", (e) => {
   const top = Math.max(8, (best.y/100)*rect.height - 64);
   tip.style.left = left+"px";
   tip.style.top = top+"px";
-});
+}
+document.addEventListener("mousemove", paintDcaTip);
+document.addEventListener("click", paintDcaTip);
 
 render();
 loadPrices();
