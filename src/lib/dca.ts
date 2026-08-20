@@ -13,6 +13,7 @@ import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "./types";
 import { remainingCoins } from "./assets";
 
 export type DcaPoint = {
+  t: number;
   date: string;
   label: string;
   fullDate: string;
@@ -20,11 +21,12 @@ export type DcaPoint = {
   usd: number | null;
   fill: number;
   target: number;
-  milestone?: 25 | 50 | 75;
+  milestone?: 25 | 50 | 75 | 100;
 };
 
 export type DcaMilestone = {
   pct: 25 | 50 | 75;
+  t: number;
   date: string;
   label: string;
   fullDate: string;
@@ -69,10 +71,12 @@ function pointOf(
   price: number | null,
   label?: string,
 ): DcaPoint {
+  const day = startOfDay(date);
   return {
-    date: format(date, "yyyy-MM-dd"),
-    label: label ?? format(date, "MMM d"),
-    fullDate: fullDateLabel(date),
+    t: day.getTime(),
+    date: format(day, "yyyy-MM-dd"),
+    label: label ?? format(day, "MMM d"),
+    fullDate: fullDateLabel(day),
     amount,
     usd: price != null ? amount * price : null,
     fill: target > 0 ? amount / target : 0,
@@ -80,25 +84,43 @@ function pointOf(
   };
 }
 
-export function markMilestones(series: DcaPoint[], currentAmount: number, targetAmount: number): DcaMilestone[] {
-  if (!(targetAmount > 0) || series.length === 0) return [];
-  const out: DcaMilestone[] = [];
-  for (const pct of [25, 50, 75] as const) {
-    const need = targetAmount * (pct / 100);
-    if (currentAmount + 1e-12 >= need) continue;
-    const hit = series.find((p) => p.amount + 1e-12 >= need);
-    if (!hit) continue;
-    hit.milestone = pct;
-    out.push({
-      pct,
-      date: hit.date,
-      label: hit.label,
-      fullDate: hit.fullDate,
-      amount: hit.amount,
-      usd: hit.usd,
-    });
+export function markMilestones(series: DcaPoint[]): DcaMilestone[] {
+  return series
+    .filter((p): p is DcaPoint & { milestone: 25 | 50 | 75 } => p.milestone === 25 || p.milestone === 50 || p.milestone === 75)
+    .map((p) => ({
+      pct: p.milestone,
+      t: p.t,
+      date: p.date,
+      label: p.label,
+      fullDate: p.fullDate,
+      amount: p.amount,
+      usd: p.usd,
+    }));
+}
+
+function mergePoint(series: DcaPoint[], point: DcaPoint): DcaPoint[] {
+  const idx = series.findIndex((p) => p.date === point.date);
+  if (idx >= 0) {
+    const next = [...series];
+    next[idx] = { ...series[idx], ...point, amount: point.amount, milestone: point.milestone ?? series[idx].milestone };
+    return next;
   }
-  return out;
+  return [...series, point].sort((a, b) => a.t - b.t);
+}
+
+function buysCompleted(daysElapsed: number, freq: DcaFrequency, periods: number, totalDays: number): number {
+  if (daysElapsed <= 0) return 0;
+  if (daysElapsed >= totalDays) return periods;
+  switch (freq) {
+    case "daily":
+      return Math.min(periods, daysElapsed);
+    case "weekly":
+      return Math.min(periods, Math.floor(daysElapsed / 7));
+    case "biweekly":
+      return Math.min(periods, Math.floor(daysElapsed / 14));
+    case "monthly":
+      return Math.min(periods, Math.floor((daysElapsed / totalDays) * periods));
+  }
 }
 
 export function chartDots(series: DcaPoint[]): DcaPoint[] {
@@ -191,23 +213,46 @@ export function quoteDca(
   const coinsPerBuy = remain / periods;
   const usdPerBuy = remainingUsd != null ? remainingUsd / periods : null;
 
-  const schedule: DcaQuote["schedule"] = [];
-  const series: DcaPoint[] = [
-    pointOf(now, holding.currentAmount, holding.targetAmount, priceUsed, "Now"),
-  ];
+  const start = startOfDay(now);
+  const end = startOfDay(target);
+  const totalDays = Math.max(1, differenceInCalendarDays(end, start));
+  const sampleEvery = totalDays <= 240 ? 1 : Math.ceil(totalDays / 240);
 
-  const previewCount = Math.min(periods, 8);
-  for (let i = 1; i <= periods; i += 1) {
-    const date = stepDate(now, plan.frequency, i);
-    const amount = Math.min(holding.targetAmount, holding.currentAmount + coinsPerBuy * i);
-    const point = pointOf(date, amount, holding.targetAmount, priceUsed);
-    if (i <= previewCount || i === periods) {
-      schedule.push({ date: point.date, label: point.label, amount, usd: usdPerBuy });
-    }
-    series.push(point);
+  const amountOnDay = (daysElapsed: number) => {
+    if (daysElapsed >= totalDays) return holding.targetAmount;
+    const buys = buysCompleted(daysElapsed, plan.frequency, periods, totalDays);
+    return Math.min(holding.targetAmount, holding.currentAmount + coinsPerBuy * buys);
+  };
+
+  let series: DcaPoint[] = [pointOf(start, holding.currentAmount, holding.targetAmount, priceUsed, "Now")];
+  for (let day = sampleEvery; day < totalDays; day += sampleEvery) {
+    series.push(pointOf(addDays(start, day), amountOnDay(day), holding.targetAmount, priceUsed));
+  }
+  const done = pointOf(end, holding.targetAmount, holding.targetAmount, priceUsed, "100%");
+  done.milestone = 100;
+  done.fill = 1;
+  series = mergePoint(series, done);
+
+  for (const pct of [25, 50, 75] as const) {
+    const day = Math.round((totalDays * pct) / 100);
+    const date = day >= totalDays ? end : addDays(start, day);
+    const amount = holding.currentAmount + remain * (pct / 100);
+    const mark = pointOf(date, amount, holding.targetAmount, priceUsed, `${pct}%`);
+    mark.milestone = pct;
+    series = mergePoint(series, mark);
   }
 
-  const milestones = markMilestones(series, holding.currentAmount, holding.targetAmount);
+  const schedule: DcaQuote["schedule"] = [];
+  const previewCount = Math.min(periods, 8);
+  for (let i = 1; i <= periods; i += 1) {
+    if (!(i <= previewCount || i === periods)) continue;
+    const date = i === periods ? end : stepDate(start, plan.frequency, i);
+    const amount = i === periods ? holding.targetAmount : Math.min(holding.targetAmount, holding.currentAmount + coinsPerBuy * i);
+    const point = pointOf(date, amount, holding.targetAmount, priceUsed);
+    schedule.push({ date: point.date, label: point.label, amount, usd: usdPerBuy });
+  }
+
+  const milestones = markMilestones(series);
 
   return {
     periods,
