@@ -1,5 +1,49 @@
+function headerHtml(){
+  return `<header class="top">
+    <div class="brand-row">
+      <button class="btn btn-ghost btn-icon" data-act="nav" aria-label="Open pages" aria-expanded="${state.navOpen?"true":"false"}" aria-controls="app-pages">${I.menu}</button>
+      <button type="button" class="brand" data-act="page" data-page="ledger">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="10" width="20" height="4" rx="2" fill="#3a3b38"/><rect x="2" y="10" width="13" height="4" rx="2" fill="#f0efe8"/></svg>
+        <span>Remainder</span>
+      </button>
+    </div>
+    <button class="btn btn-outline" data-act="signin">Sign in</button>
+  </header>`;
+}
+
+function navHtml(){
+  if (!state.navOpen) return "";
+  return `<div class="nav-root">
+    <button type="button" class="nav-scrim" data-act="nav-close" aria-label="Close pages"></button>
+    <aside class="drawer" id="app-pages" role="dialog" aria-modal="true" aria-label="Pages">
+      <div class="drawer-head">
+        <p>Pages</p>
+        <button class="btn btn-ghost btn-icon" data-act="nav-close" aria-label="Close pages">${I.x}</button>
+      </div>
+      <nav class="nav-list">
+        <button type="button" class="nav-item ${state.page==="ledger"?"on":""}" data-act="page" data-page="ledger">
+          <b>Ledger</b><small>Targets, remaining capital, DCA</small>
+        </button>
+        <button type="button" class="nav-item ${state.page==="what-if"?"on":""}" data-act="page" data-page="what-if">
+          <b>What if?</b><small>Your prices. Both bags. All at once.</small>
+        </button>
+      </nav>
+    </aside>
+  </div>`;
+}
+
 function render(){
   const root = document.getElementById("app");
+  if (state.page === "what-if") {
+    if (currentDca() && (!state.form.date || state.form._for !== currentDca().id)) {
+      const hDca = currentDca();
+      const plan = hDca && state.plans.find(p=>p.holdingId===hDca.id);
+      state.form = { date: plan?.targetDate || sampleDate(), freq: plan?.frequency || "weekly", assumed: plan?.assumed!=null?String(plan.assumed):"", err:null, _for:hDca.id };
+    }
+    root.innerHTML = `<div class="wrap">${headerHtml()}${whatIfHtml()}</div>${navHtml()}${dialogHtml()}`;
+    return;
+  }
+
   const t = totals();
   const hDca = currentDca();
   const plan = hDca && state.plans.find(p=>p.holdingId===hDca.id);
@@ -10,13 +54,7 @@ function render(){
 
   root.innerHTML = `
   <div class="wrap">
-    <header class="top">
-      <a class="brand" href="./">
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="10" width="20" height="4" rx="2" fill="#3a3b38"/><rect x="2" y="10" width="13" height="4" rx="2" fill="#f0efe8"/></svg>
-        <span>Remainder</span>
-      </a>
-      <button class="btn btn-outline" data-act="signin">Sign in</button>
-    </header>
+    ${headerHtml()}
     <p class="banner">This stack stays in this browser. <button type="button" data-act="signin">Sign in</button> to save it to your account — available when you host Remainder with a database.</p>
     <section class="hero">
       <p class="kicker">Remaining to hit targets</p>
@@ -48,7 +86,7 @@ function render(){
             ${state.sortOpen ? `<div class="menu-list sort-list">${SORTS.map((s,i)=>{
               const prev = SORTS[i-1];
               const head = s.group && s.group !== prev?.group ? `<div class="grp">${esc(s.group)}</div>` : "";
-              return `${head}<button data-sort="${s.id}">${state.sort===s.id?"\u2713 ":""}${esc(s.label)}</button>`;
+              return `${head}<button data-sort="${s.id}">${state.sort===s.id?"✓ ":""}${esc(s.label)}</button>`;
             }).join("")}</div>` : ""}
           </div>` : ""}
           <button class="btn btn-outline" data-act="wallet">${I.wallet} Wallet</button>
@@ -95,7 +133,110 @@ function render(){
       </div>`}
     </section>
   </div>
+  ${navHtml()}
   ${dialogHtml()}`;
+}
+
+function whatIfHtml(){
+  const t = whatIfTotals();
+  const heldMult = t.heldLive > 0 ? t.heldYours / t.heldLive : null;
+  const targetMult = t.targetLive > 0 ? t.targetYours / t.targetLive : null;
+  return `
+    <section class="hero">
+      <p class="kicker">What if these prices hit</p>
+      <div class="hero-row">
+        <h1 data-wif-hero="target">${t.priced>0 ? esc(formatUsd(t.targetYours)) : "—"}</h1>
+        <p class="fill" data-wif-hero="target-mult">${targetMult!=null ? esc(formatMult(targetMult))+" vs live targets" : "set your prices"}</p>
+      </div>
+      <div class="stats">
+        <div><p class="stat-label">Held at your prices</p><p class="stat-value" data-wif-hero="held">${t.priced>0?esc(formatUsd(t.heldYours)):"—"}</p></div>
+        <div><p class="stat-label">Held at live</p><p class="stat-value" data-wif-hero="held-live">${t.priced>0 && t.heldLive>0?esc(formatUsd(t.heldLive)):"—"}</p></div>
+        <div><p class="stat-label">Held multiple</p><p class="stat-value" data-wif-hero="held-mult">${heldMult!=null?esc(formatMult(heldMult)):"—"}</p></div>
+      </div>
+      <div class="price-row">
+        <p class="held">Set a price on every asset. Both bags update together.</p>
+        ${state.holdings.length ? `<button class="btn btn-outline" data-act="wif-reset">Use live prices</button>` : ""}
+      </div>
+    </section>
+    <section class="section">
+      <h2>Your prices</h2>
+      ${state.holdings.length===0 ? `<div class="empty">
+        <h3>Nothing to stress-test</h3>
+        <p>Add a target on the ledger first, then come back and punch in the prices you actually want.</p>
+        <div class="actions"><button class="btn btn-primary" data-act="page" data-page="ledger">Back to ledger</button></div>
+      </div>` : `<div class="grid">${state.holdings.map(whatIfCardHtml).join("")}</div>`}
+    </section>`;
+}
+
+function whatIfCardHtml(h){
+  const live = state.prices[h.idg];
+  const yours = yoursPrice(h);
+  const heldYours = yours!=null ? h.current*yours : null;
+  const targetYours = yours!=null ? h.target*yours : null;
+  const heldLive = live>0 ? h.current*live : null;
+  const targetLive = live>0 ? h.target*live : null;
+  const mult = live>0 && yours!=null ? yours/live : null;
+  const draft = draftFor(h);
+  return `<article class="card" data-wif-card="${esc(h.idg)}">
+    <div class="card-top">
+      <div>
+        <div class="sym"><h3>${esc(h.symbol)}</h3><span>${esc(h.name)}</span></div>
+        <p class="held">${live>0 ? "Live "+esc(formatUsd(live,{precise:true})) : "Live price pending"}</p>
+      </div>
+      <p class="held" data-wif-row="mult">${mult!=null?esc(formatMult(mult)):""}</p>
+    </div>
+    <label class="wif-field">
+      <span class="lbl">Your price</span>
+      <span class="wif-wrap">
+        <span class="cur">$</span>
+        <input data-wif="${esc(h.idg)}" inputmode="decimal" value="${esc(draft)}" placeholder="${live>0?esc(draftPrice(live)):"0"}" aria-label="${esc(h.symbol)} what-if price" />
+      </span>
+    </label>
+    <div class="wif-pair">
+      <div>
+        <p class="stat-label">Held now</p>
+        <p class="stat-value" data-wif-row="held">${heldYours!=null?esc(formatUsd(heldYours)):"—"}</p>
+        ${heldLive!=null?`<p class="held" data-wif-row="held-live">live ${esc(formatUsd(heldLive))}</p>`:""}
+      </div>
+      <div>
+        <p class="stat-label">At target</p>
+        <p class="stat-value" data-wif-row="target">${targetYours!=null?esc(formatUsd(targetYours)):"—"}</p>
+        ${targetLive!=null?`<p class="held" data-wif-row="target-live">live ${esc(formatUsd(targetLive))}</p>`:""}
+      </div>
+    </div>
+  </article>`;
+}
+
+function paintWhatIf(){
+  const heroTarget = document.querySelector("[data-wif-hero=target]");
+  if (!heroTarget) { render(); return; }
+  const t = whatIfTotals();
+  const heldMult = t.heldLive > 0 ? t.heldYours / t.heldLive : null;
+  const targetMult = t.targetLive > 0 ? t.targetYours / t.targetLive : null;
+  heroTarget.textContent = t.priced>0 ? formatUsd(t.targetYours) : "—";
+  const el = (sel) => document.querySelector(sel);
+  const set = (sel, text) => { const n = el(sel); if (n) n.textContent = text; };
+  set("[data-wif-hero=target-mult]", targetMult!=null ? formatMult(targetMult)+" vs live targets" : "set your prices");
+  set("[data-wif-hero=held]", t.priced>0 ? formatUsd(t.heldYours) : "—");
+  set("[data-wif-hero=held-live]", t.priced>0 && t.heldLive>0 ? formatUsd(t.heldLive) : "—");
+  set("[data-wif-hero=held-mult]", heldMult!=null ? formatMult(heldMult) : "—");
+  for (const h of state.holdings) {
+    const card = document.querySelector(`[data-wif-card="${h.idg}"]`);
+    if (!card) continue;
+    const live = state.prices[h.idg];
+    const yours = yoursPrice(h);
+    const heldYours = yours!=null ? h.current*yours : null;
+    const targetYours = yours!=null ? h.target*yours : null;
+    const heldLive = live>0 ? h.current*live : null;
+    const targetLive = live>0 ? h.target*live : null;
+    const mult = live>0 && yours!=null ? yours/live : null;
+    const row = (name) => card.querySelector(`[data-wif-row="${name}"]`);
+    if (row("mult")) row("mult").textContent = mult!=null ? formatMult(mult) : "";
+    if (row("held")) row("held").textContent = heldYours!=null ? formatUsd(heldYours) : "—";
+    if (row("held-live") && heldLive!=null) row("held-live").textContent = "live "+formatUsd(heldLive);
+    if (row("target")) row("target").textContent = targetYours!=null ? formatUsd(targetYours) : "—";
+    if (row("target-live") && targetLive!=null) row("target-live").textContent = "live "+formatUsd(targetLive);
+  }
 }
 
 function cardHtml(h){
@@ -208,6 +349,15 @@ document.getElementById("app").addEventListener("click", (e) => {
   if (t?.hasAttribute("data-close")) { closeDialog(); return; }
   if (!t) { if (state.menu || state.sortOpen) { state.menu=null; state.sortOpen=false; render(); } return; }
   if (t.dataset.act==="signin") openSignIn();
+  else if (t.dataset.act==="nav") { state.navOpen=!state.navOpen; state.menu=null; state.sortOpen=false; render(); }
+  else if (t.dataset.act==="nav-close") { state.navOpen=false; render(); }
+  else if (t.dataset.act==="page") goPage(t.dataset.page);
+  else if (t.dataset.act==="wif-reset") {
+    state.whatIf = {};
+    state.whatIfDraft = {};
+    saveWhatIf();
+    render();
+  }
   else if (t.dataset.act==="add") openAdd();
   else if (t.dataset.act==="wallet") openWallet();
   else if (t.dataset.act==="sample") { Object.assign(state, makeSample()); persist(); render(); }
@@ -233,6 +383,16 @@ document.getElementById("app").addEventListener("change", (e) => {
 });
 document.getElementById("app").addEventListener("input", (e) => {
   const d = state.dialog;
+  if (e.target.dataset.wif) {
+    const id = e.target.dataset.wif;
+    state.whatIfDraft[id] = e.target.value;
+    const n = parseAmt(e.target.value);
+    if (n != null && n > 0) state.whatIf[id] = n;
+    else delete state.whatIf[id];
+    saveWhatIf();
+    paintWhatIf();
+    return;
+  }
   if (e.target.id==="dca-date") state.form.date=e.target.value;
   if (e.target.id==="dca-price") state.form.assumed=e.target.value;
   if (e.target.id==="asset-search") { d.query=e.target.value; render(); e.target.focus(); const el=document.getElementById("asset-search"); if(el){ el.value=d.query; el.focus(); el.setSelectionRange(d.query.length,d.query.length);} }
@@ -245,8 +405,20 @@ document.getElementById("app").addEventListener("input", (e) => {
     window.__dcaT = setTimeout(render, 250);
   }
 });
+window.addEventListener("hashchange", () => {
+  const next = pageFromHash();
+  if (next !== state.page) { state.page = next; state.navOpen = false; render(); }
+});
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && state.navOpen) { state.navOpen = false; render(); }
+});
 
 render();
 loadPrices();
 setInterval(loadPrices, 60000);
-setInterval(() => { if (state.priceAt && !state.dialog && !state.menu && !state.sortOpen) render(); }, 15000);
+setInterval(() => {
+  if (state.priceAt && !state.dialog && !state.menu && !state.sortOpen && !state.navOpen) {
+    if (state.page === "what-if" && document.activeElement && document.activeElement.dataset && document.activeElement.dataset.wif) return;
+    render();
+  }
+}, 15000);

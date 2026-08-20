@@ -16,7 +16,6 @@ import { usePrices } from "@/hooks/use-prices";
 import { AddHoldingDialog } from "@/components/add-holding-dialog";
 import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
-import { SiteHeader } from "@/components/site-header";
 import { WalletDialog } from "@/components/wallet-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -94,25 +93,20 @@ export function Dashboard() {
 
   if (portfolio.isLoading) {
     return (
-      <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
-        <SiteHeader />
-        <div className="mt-10 space-y-4">
-          <p className="text-sm text-muted-foreground">Loading your ledger…</p>
-          <Skeleton className="h-12 w-48" />
-          <Skeleton className="h-20 w-72" />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Skeleton className="h-48" />
-            <Skeleton className="h-48" />
-          </div>
+      <div className="mt-10 space-y-4">
+        <p className="text-sm text-muted-foreground">Loading your ledger…</p>
+        <Skeleton className="h-12 w-48" />
+        <Skeleton className="h-20 w-72" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 pb-16 sm:px-6">
-      <SiteHeader />
-
+    <>
       {!portfolio.signedIn && (
         <p className="mt-2 rounded-lg bg-secondary/70 px-3 py-2 text-sm text-muted-foreground">
           This stack stays in this browser.{" "}
@@ -131,7 +125,7 @@ export function Dashboard() {
           <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
             {totals.priced > 0 ? formatUsd(totals.remainUsd) : "—"}
           </h1>
-          <p className="pb-1 font-mono text-sm text-muted-foreground tabular-nums">
+          <p className="pb-1 font-mono text-sm tabular-nums text-muted-foreground">
             {formatPercent(totals.fill)} filled
           </p>
         </div>
@@ -308,7 +302,7 @@ export function Dashboard() {
         onApply={applyWallet}
         onAddFromWallet={(input) => portfolio.add(input).then(() => undefined)}
       />
-    </div>
+    </>
   );
 }
 

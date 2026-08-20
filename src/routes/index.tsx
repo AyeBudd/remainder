@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Dashboard } from "@/components/dashboard";
+import { AppFrame } from "@/components/app-frame";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
-  return <Dashboard />;
+  return <AppFrame />;
 }

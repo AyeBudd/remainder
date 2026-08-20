@@ -19,6 +19,7 @@ const I = {
   route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
   sort: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 16 4 4 4-4"/><path d="M7 20V4"/><path d="m21 8-4-4-4 4"/><path d="M17 4v16"/></svg>',
+  menu: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>',
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>',
 };
 
@@ -94,6 +95,76 @@ function loadSort(){
 }
 function saveSort(id){ try { localStorage.setItem(SORT_KEY, id); } catch {} }
 
+const WHAT_IF_KEY = "remainder.whatif";
+const VIEW_KEY = "remainder.view";
+function pageFromHash(){
+  try {
+    const h = String(location.hash || "").replace(/^#\/?/, "");
+    if (h === "what-if") return "what-if";
+    if (localStorage.getItem(VIEW_KEY) === "what-if") return "what-if";
+  } catch {}
+  return "ledger";
+}
+function loadWhatIf(){
+  try {
+    const raw = localStorage.getItem(WHAT_IF_KEY);
+    if (!raw) return {};
+    const p = JSON.parse(raw);
+    const next = {};
+    if (p && typeof p === "object") {
+      for (const [k, v] of Object.entries(p)) {
+        const n = Number(v);
+        if (k && Number.isFinite(n) && n > 0) next[k] = n;
+      }
+    }
+    return next;
+  } catch { return {}; }
+}
+function saveWhatIf(){ try { localStorage.setItem(WHAT_IF_KEY, JSON.stringify(state.whatIf)); } catch {} }
+function goPage(id){
+  state.page = id === "what-if" ? "what-if" : "ledger";
+  state.navOpen = false;
+  try { localStorage.setItem(VIEW_KEY, state.page); } catch {}
+  const next = state.page === "what-if" ? "#/what-if" : "#/";
+  if (location.hash !== next) history.replaceState(null, "", next);
+  render();
+}
+function yoursPrice(h){
+  const c = state.whatIf[h.idg];
+  if (c > 0) return c;
+  const live = state.prices[h.idg];
+  return live > 0 ? live : null;
+}
+function whatIfTotals(){
+  let heldLive = 0, heldYours = 0, targetLive = 0, targetYours = 0, priced = 0;
+  for (const h of state.holdings) {
+    const live = state.prices[h.idg];
+    const yours = yoursPrice(h);
+    if (yours == null) continue;
+    priced++;
+    heldYours += h.current * yours;
+    targetYours += h.target * yours;
+    if (live > 0) { heldLive += h.current * live; targetLive += h.target * live; }
+  }
+  return { heldLive, heldYours, targetLive, targetYours, priced };
+}
+function formatMult(r){
+  if (!Number.isFinite(r) || r <= 0) return "—";
+  return "×" + (r >= 10 ? r.toFixed(1) : r.toFixed(2));
+}
+function draftPrice(n){
+  if (!Number.isFinite(n) || n <= 0) return "";
+  if (n >= 1000) return String(Math.round(n * 100) / 100);
+  if (n >= 1) return String(Number(n.toPrecision(8)));
+  return String(Number(n.toPrecision(6)));
+}
+function draftFor(h){
+  if (state.whatIfDraft[h.idg] != null) return state.whatIfDraft[h.idg];
+  if (state.whatIf[h.idg] > 0) return draftPrice(state.whatIf[h.idg]);
+  if (state.prices[h.idg] > 0) return draftPrice(state.prices[h.idg]);
+  return "";
+}
+
 const state = {
   ...load(),
   prices: {},
@@ -102,6 +173,10 @@ const state = {
   priceBusy: false,
   sort: loadSort(),
   sortOpen: false,
+  page: pageFromHash(),
+  navOpen: false,
+  whatIf: loadWhatIf(),
+  whatIfDraft: {},
   menu: null,
   dialog: null,
   dcaId: null,

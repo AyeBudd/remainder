@@ -13,6 +13,7 @@ The public GitHub Pages site is the same ledger you see in preview — guest mod
 - Target stacks with live USD remaining and fill progress
 - Manual current holdings, or wallet import (injected MetaMask / Rabby)
 - Per-asset DCA plans: date, cadence, optional assumed price, projection chart
+- What if? calculator: set your own price on every asset and see held + target value at once
 - Sign in with Google or X to save a stack to your account (self-hosted)
 - Guest mode stores the ledger in the browser
 

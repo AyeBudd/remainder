@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import type { AppView } from "@/lib/view";
+import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -62,13 +64,25 @@ function AuthSlot() {
   );
 }
 
-export function SiteHeader() {
+type Props = {
+  view?: AppView;
+  onViewChange?: (view: AppView) => void;
+};
+
+export function SiteHeader({ view = "ledger", onViewChange }: Props) {
   return (
     <header className="flex h-16 items-center justify-between gap-4">
-      <Link to="/" className="flex items-center gap-2.5 text-foreground">
-        <Mark />
-        <span className="font-serif text-xl tracking-tight">Remainder</span>
-      </Link>
+      <div className="flex min-w-0 items-center gap-1">
+        {onViewChange && <AppNav view={view} onChange={onViewChange} />}
+        <button
+          type="button"
+          className="flex items-center gap-2.5 bg-transparent text-foreground"
+          onClick={() => onViewChange?.("ledger")}
+        >
+          <Mark />
+          <span className="font-serif text-xl tracking-tight">Remainder</span>
+        </button>
+      </div>
       <AuthSlot />
     </header>
   );
