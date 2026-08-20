@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
@@ -28,6 +29,7 @@ type Props = {
 
 export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete }: Props) {
   const navigate = useNavigate();
+  const skipNav = useRef(false);
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
   const ratio = fillRatio(holding.currentAmount, holding.targetAmount);
   const currentUsd = price != null ? holding.currentAmount * price : null;
@@ -39,8 +41,22 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
       ? currentUsd - holding.targetAmount * price
       : 0;
 
+  const holdNav = () => {
+    skipNav.current = true;
+    window.setTimeout(() => {
+      skipNav.current = false;
+    }, 400);
+  };
+
   const openAsset = () => {
+    if (skipNav.current) return;
     void navigate({ to: "/asset/$id", params: { id: holding.coingeckoId } });
+  };
+
+  const run = (fn: () => void) => (event: Event) => {
+    event.preventDefault();
+    holdNav();
+    fn();
   };
 
   return (
@@ -80,22 +96,35 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             )}
           </div>
         </div>
-        <DropdownMenu>
+        <DropdownMenu
+          onOpenChange={(open) => {
+            if (!open) holdNav();
+          }}
+        >
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
               aria-label={`Actions for ${holding.symbol}`}
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                holdNav();
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
             >
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={onEdit}>Edit amounts</DropdownMenuItem>
-            <DropdownMenuItem onSelect={onPlan}>Plan DCA</DropdownMenuItem>
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={(e) => e.preventDefault()}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <DropdownMenuItem onSelect={run(onEdit)}>Edit amounts</DropdownMenuItem>
+            <DropdownMenuItem onSelect={run(onPlan)}>Plan DCA</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive" onSelect={onDelete}>
+            <DropdownMenuItem className="text-destructive" onSelect={run(onDelete)}>
               Remove
             </DropdownMenuItem>
           </DropdownMenuContent>
