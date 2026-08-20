@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { ASSETS, type Asset } from "@/lib/assets";
-import { parseAmount } from "@/lib/format";
+import { formatUsd, parseAmount } from "@/lib/format";
 import type { Holding, HoldingInput } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+type CostMode = "total" | "avg";
+
+function compactNum(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return "";
+  const digits = value >= 1000 ? 2 : value >= 1 ? 4 : 8;
+  return String(Number(value.toFixed(digits)));
+}
 
 type Props = {
   open: boolean;
@@ -47,6 +55,7 @@ export function AddHoldingDialog({
   const [cost, setCost] = useState(
     editing?.costBasisUsd != null ? String(editing.costBasisUsd) : "",
   );
+  const [costMode, setCostMode] = useState<CostMode>("total");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useCustom, setUseCustom] = useState(false);
@@ -61,6 +70,7 @@ export function AddHoldingDialog({
       setTarget("");
       setCurrent("");
       setCost("");
+      setCostMode("total");
       setError(null);
       setUseCustom(false);
       setBusy(false);
@@ -92,10 +102,22 @@ export function AddHoldingDialog({
       setError("Current holding must be a number.");
       return;
     }
-    const costBasisUsd = cost.trim() === "" ? undefined : parseAmount(cost);
-    if (cost.trim() !== "" && (costBasisUsd == null || costBasisUsd < 0)) {
-      setError("Cost basis must be a dollar amount, or leave it blank to mark at the live price.");
+    const entered = cost.trim() === "" ? undefined : parseAmount(cost);
+    if (cost.trim() !== "" && (entered == null || entered < 0)) {
+      setError("Cost must be a dollar amount, or leave it blank to mark at the live price.");
       return;
+    }
+    let costBasisUsd: number | undefined;
+    if (entered != null) {
+      if (costMode === "avg") {
+        if (currentAmount <= 0) {
+          setError("Add a current holding to use average cost per coin.");
+          return;
+        }
+        costBasisUsd = entered * currentAmount;
+      } else {
+        costBasisUsd = entered;
+      }
     }
     const chosen = useCustom
       ? {
@@ -141,6 +163,27 @@ export function AddHoldingDialog({
       setBusy(false);
     }
   };
+
+  const chooseCostMode = (next: CostMode) => {
+    if (next === costMode) return;
+    const qty = parseAmount(current);
+    const n = parseAmount(cost);
+    if (n != null && n > 0 && qty != null && qty > 0) {
+      setCost(next === "avg" ? compactNum(n / qty) : compactNum(n * qty));
+    }
+    setCostMode(next);
+  };
+
+  const qtyNow = parseAmount(current);
+  const costNow = parseAmount(cost);
+  const costPreview =
+    costNow != null && costNow > 0 && qtyNow != null && qtyNow > 0
+      ? costMode === "avg"
+        ? `Books ${formatUsd(costNow * qtyNow)} for the bag`
+        : `${formatUsd(costNow / qtyNow, { precise: true })} avg per ${
+            (asset?.symbol ?? editing?.symbol ?? customSymbol) || "coin"
+          }`
+      : null;
 
   return (
     <Dialog open={open} onOpenChange={reset}>
@@ -253,17 +296,33 @@ export function AddHoldingDialog({
             />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="cost-basis">Cost basis (USD)</Label>
-            <Input
-              id="cost-basis"
-              inputMode="decimal"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-              placeholder="What you paid for this bag"
-            />
+            <Label htmlFor="cost-basis">Cost</Label>
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+              <select
+                id="cost-mode"
+                className="h-11 rounded-md bg-secondary px-3 text-sm text-foreground shadow-[var(--shadow-border)]"
+                value={costMode}
+                onChange={(e) => chooseCostMode(e.target.value as CostMode)}
+                aria-label="Cost entry mode"
+              >
+                <option value="total">Total spent on bag</option>
+                <option value="avg">Avg cost per coin</option>
+              </select>
+              <Input
+                id="cost-basis"
+                inputMode="decimal"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder={costMode === "avg" ? "Coinbase average cost" : "Total dollars in"}
+              />
+            </div>
             <p className="text-xs text-muted-foreground">
-              Total dollars in, not per coin. Leave blank to keep auto-marking at the live price.
+              {costMode === "avg"
+                ? "Same number Coinbase shows as average cost. We multiply by your current holding."
+                : "Total dollars in for this bag."}{" "}
+              Leave blank to keep auto-marking at the live price.
             </p>
+            {costPreview && <p className="text-xs tabular-nums text-muted-foreground">{costPreview}</p>}
           </div>
         </div>
 
