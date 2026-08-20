@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from "react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { GROK_PROVIDERS, authClient, authEnabled, signIn } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +7,29 @@ import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/login")({ component: Login });
 
+function oauthHost(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return (
+    host.endsWith(".grok-sandbox.com") ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "[::1]"
+  );
+}
+
 function Login() {
-  const navigate = useNavigate();
-  const [mode, setMode] = useState<"in" | "up">("in");
+  const [mode, setMode] = useState<"in" | "up">("up");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showOauth, setShowOauth] = useState(false);
+
+  useEffect(() => {
+    setShowOauth(oauthHost());
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -38,7 +53,7 @@ function Login() {
         setError(result.error.message || "Could not sign in");
         return;
       }
-      await navigate({ to: "/" });
+      window.location.assign("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");
     } finally {
@@ -55,7 +70,7 @@ function Login() {
         {mode === "up" ? "Create account" : "Sign in"}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Save targets to your account. Wallet reads stay in the browser.
+        Email saves this stack to your account. Wallet reads stay in the browser.
       </p>
 
       {authEnabled ? (
@@ -116,25 +131,28 @@ function Login() {
             </button>
           </p>
 
-          <div className="mt-8 flex items-center gap-3 text-xs tracking-wide text-muted-foreground uppercase">
-            <span className="h-px flex-1 bg-border" />
-            or
-            <span className="h-px flex-1 bg-border" />
-          </div>
-
-          <div className="mt-6 space-y-3">
-            {GROK_PROVIDERS.map((p) => (
-              <Button
-                key={p.providerId}
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={() => signIn(p.providerId, { callbackURL: "/" })}
-              >
-                Continue with {p.label}
-              </Button>
-            ))}
-          </div>
+          {showOauth && (
+            <>
+              <div className="mt-8 flex items-center gap-3 text-xs tracking-wide text-muted-foreground uppercase">
+                <span className="h-px flex-1 bg-border" />
+                or
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <div className="mt-6 space-y-3">
+                {GROK_PROVIDERS.map((p) => (
+                  <Button
+                    key={p.providerId}
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => signIn(p.providerId, { callbackURL: "/" })}
+                  >
+                    Continue with {p.label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
         </>
       ) : (
         <p className="mt-8 text-sm text-muted-foreground">Sign-in is disabled.</p>
