@@ -24,12 +24,13 @@ type Props = {
   price?: number;
   change?: number;
   onEdit: () => void;
+  onBuy: () => void;
   onPlan: () => void;
   onDelete: () => void;
   hideAmounts?: boolean;
 };
 
-export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete, hideAmounts }: Props) {
+export function HoldingCard({ holding, plan, price, change, onEdit, onBuy, onPlan, onDelete, hideAmounts }: Props) {
   const navigate = useNavigate();
   const skipNav = useRef(false);
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
@@ -124,6 +125,7 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             onPointerDown={(e) => e.stopPropagation()}
           >
             <DropdownMenuItem onSelect={run(onEdit)}>Edit amounts</DropdownMenuItem>
+            <DropdownMenuItem onSelect={run(onBuy)}>Add buy</DropdownMenuItem>
             <DropdownMenuItem onSelect={run(onPlan)}>Plan DCA</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive" onSelect={run(onDelete)}>

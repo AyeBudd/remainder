@@ -17,6 +17,7 @@ import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import { veil } from "@/lib/privacy";
+import { AddBuyDialog } from "@/components/add-buy-dialog";
 import { AddHoldingDialog } from "@/components/add-holding-dialog";
 import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
@@ -39,6 +40,7 @@ export function Dashboard() {
   const [addOpen, setAddOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
+  const [buying, setBuying] = useState<Holding | null>(null);
   const [dcaId, setDcaId] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [sort, setSort] = useState<HoldingSort>(() => readHoldingSort());
@@ -332,6 +334,7 @@ export function Dashboard() {
                 change={changes?.[holding.coingeckoId]}
                 hideAmounts={hideAmounts}
                 onEdit={() => setEditing(holding)}
+                onBuy={() => setBuying(holding)}
                 onPlan={() => {
                   setDcaId(holding.id);
                   document.getElementById("dca")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -373,6 +376,18 @@ export function Dashboard() {
         assets={assets}
         editing={editing}
         onSave={saveHolding}
+      />
+      <AddBuyDialog
+        open={Boolean(buying)}
+        holding={buying}
+        price={buying ? prices[buying.coingeckoId] : undefined}
+        onOpenChange={(open) => {
+          if (!open) setBuying(null);
+        }}
+        onSave={async (patch) => {
+          if (!buying) return;
+          await portfolio.update(buying.id, patch);
+        }}
       />
       <WalletDialog
         open={walletOpen}
