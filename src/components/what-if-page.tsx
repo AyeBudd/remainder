@@ -6,13 +6,18 @@ import { veil } from "@/lib/privacy";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import type { Holding } from "@/lib/types";
 import {
+  draftsForHoldings,
   draftFromPrice,
   parseWhatIfPrice,
+  readWhatIfActive,
   readWhatIfPrices,
   scenarioForHolding,
   scenarioTotals,
+  WHAT_IF_SLOTS,
+  writeWhatIfActive,
   writeWhatIfPrices,
   type WhatIfPrices,
+  type WhatIfSlot,
 } from "@/lib/what-if";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
@@ -28,10 +33,12 @@ export function WhatIfPage({ onBack }: Props) {
   const portfolio = usePortfolio();
   const { prices } = usePrices();
   const { hidden: hideAmounts } = useHideAmounts();
+  const [slot, setSlot] = useState<WhatIfSlot>(() => readWhatIfActive());
   const [custom, setCustom] = useState<WhatIfPrices>(() => readWhatIfPrices());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
   const holdings = portfolio.holdings;
+  const meta = WHAT_IF_SLOTS.find((s) => s.id === slot) ?? WHAT_IF_SLOTS[0];
 
   useEffect(() => {
     setDrafts((prev) => {
@@ -57,6 +64,15 @@ export function WhatIfPage({ onBack }: Props) {
     [holdings, prices, custom],
   );
 
+  const chooseSlot = (next: WhatIfSlot) => {
+    if (next === slot) return;
+    writeWhatIfActive(next);
+    const pricesForSlot = readWhatIfPrices(next);
+    setSlot(next);
+    setCustom(pricesForSlot);
+    setDrafts(draftsForHoldings(holdings, pricesForSlot, prices));
+  };
+
   const setDraft = (id: string, raw: string) => {
     setDrafts((prev) => ({ ...prev, [id]: raw }));
     const parsed = parseWhatIfPrice(raw);
@@ -64,20 +80,15 @@ export function WhatIfPage({ onBack }: Props) {
       const next = { ...prev };
       if (parsed != null) next[id] = parsed;
       else delete next[id];
-      writeWhatIfPrices(next);
+      writeWhatIfPrices(next, slot);
       return next;
     });
   };
 
   const resetToLive = () => {
-    writeWhatIfPrices({});
+    writeWhatIfPrices({}, slot);
     setCustom({});
-    const seeded: Record<string, string> = {};
-    for (const holding of holdings) {
-      const live = prices[holding.coingeckoId];
-      seeded[holding.coingeckoId] = live != null ? draftFromPrice(live) : "";
-    }
-    setDrafts(seeded);
+    setDrafts(draftsForHoldings(holdings, {}, prices));
   };
 
   if (portfolio.isLoading) {
@@ -105,7 +116,25 @@ export function WhatIfPage({ onBack }: Props) {
         <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
           What if these prices hit
         </p>
-        <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        <div className="mt-3 grid grid-cols-2 gap-1 rounded-lg bg-secondary p-1 sm:max-w-sm">
+          {WHAT_IF_SLOTS.map((item) => {
+            const on = item.id === slot;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => chooseSlot(item.id)}
+                className={`rounded-md px-3 py-2 text-sm transition-colors ${
+                  on ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2 text-sm text-muted-foreground">{meta.blurb}</p>
+        <div className="mt-4 flex flex-wrap items-end justify-between gap-4">
           <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
             {hideAmounts
               ? targetMult != null
@@ -116,12 +145,16 @@ export function WhatIfPage({ onBack }: Props) {
                 : "—"}
           </h1>
           <p className="pb-1 font-mono text-sm text-muted-foreground tabular-nums">
-            {hideAmounts ? "vs live targets" : targetMult != null ? `${formatMultiple(targetMult)} vs live targets` : "set your prices"}
+            {hideAmounts
+              ? `vs live · ${meta.label}`
+              : targetMult != null
+                ? `${formatMultiple(targetMult)} vs live · ${meta.label}`
+                : `set ${meta.label.toLowerCase()} prices`}
           </p>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <MiniStat
-            label="Held at your prices"
+            label={`Held · ${meta.label}`}
             value={totals.priced > 0 ? veil(hideAmounts, formatUsd(hopiumHeld)) : "—"}
           />
           <MiniStat
@@ -136,19 +169,19 @@ export function WhatIfPage({ onBack }: Props) {
         </div>
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            Set a price on every asset. Both bags update together.
+            Two books. Flip between them anytime — each save stays put.
           </p>
           {holdings.length > 0 && (
             <Button variant="outline" onClick={resetToLive}>
               <RotateCcw />
-              Use live prices
+              Reset {meta.label.toLowerCase()} to live
             </Button>
           )}
         </div>
       </section>
 
       <section className="mt-10">
-        <h2 className="font-serif text-2xl tracking-tight">Your prices</h2>
+        <h2 className="font-serif text-2xl tracking-tight">{meta.label} prices</h2>
         {holdings.length === 0 ? (
           <div className="mt-4 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
             <h3 className="font-serif text-3xl tracking-tight">Nothing to stress-test</h3>
