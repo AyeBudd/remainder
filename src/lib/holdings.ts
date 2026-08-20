@@ -247,7 +247,7 @@ export const updateHolding = createServerFn({ method: "POST" })
     const walletAddress =
       data.walletAddress === undefined ? row.wallet_address : data.walletAddress;
     let costBasisUsd = data.costBasisUsd !== undefined ? data.costBasisUsd : prev.costBasisUsd;
-    if (data.markPrice && data.markPrice > 0) {
+    if (data.costBasisUsd === undefined && data.markPrice && data.markPrice > 0) {
       costBasisUsd = rollCostBasis(prev.currentAmount, costBasisUsd, currentAmount, data.markPrice);
     }
     const updated = await sql<HoldingRow>`

@@ -44,6 +44,9 @@ export function AddHoldingDialog({
   const [current, setCurrent] = useState(
     editing ? String(editing.currentAmount) : initialCurrent != null ? String(initialCurrent) : "",
   );
+  const [cost, setCost] = useState(
+    editing?.costBasisUsd != null ? String(editing.costBasisUsd) : "",
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useCustom, setUseCustom] = useState(false);
@@ -57,6 +60,7 @@ export function AddHoldingDialog({
       setCustomId("");
       setTarget("");
       setCurrent("");
+      setCost("");
       setError(null);
       setUseCustom(false);
       setBusy(false);
@@ -86,6 +90,11 @@ export function AddHoldingDialog({
     }
     if (currentAmount == null) {
       setError("Current holding must be a number.");
+      return;
+    }
+    const costBasisUsd = cost.trim() === "" ? undefined : parseAmount(cost);
+    if (cost.trim() !== "" && (costBasisUsd == null || costBasisUsd < 0)) {
+      setError("Cost basis must be a dollar amount, or leave it blank to mark at the live price.");
       return;
     }
     const chosen = useCustom
@@ -122,7 +131,7 @@ export function AddHoldingDialog({
           walletAddress: editing?.walletAddress ?? null,
           walletAmount: editing?.walletAmount ?? 0,
           manualAmount: Math.max(0, currentAmount - (editing?.walletAmount ?? 0)),
-          costBasisUsd: editing?.costBasisUsd ?? null,
+          ...(costBasisUsd != null ? { costBasisUsd } : {}),
         },
         editing?.id,
       );
@@ -139,7 +148,9 @@ export function AddHoldingDialog({
         <DialogHeader>
           <DialogTitle>{editing ? `Edit ${editing.symbol}` : "Add a target"}</DialogTitle>
           <DialogDescription>
-            Pick from the current top 250 by market cap, or add any CoinGecko id. Type to search the full list. Current amount can be typed in or filled from a wallet later.
+            {editing
+              ? "Update amounts and, if you know it, what this bag actually cost. Blank cost keeps the current book (or marks new coins at the live price)."
+              : "Pick from the current top 250 by market cap, or add any CoinGecko id. Cost basis is optional — leave it blank to mark at the live price when you save."}
           </DialogDescription>
         </DialogHeader>
 
@@ -240,6 +251,19 @@ export function AddHoldingDialog({
               onChange={(e) => setCurrent(e.target.value)}
               placeholder="0"
             />
+          </div>
+          <div className="space-y-1.5 sm:col-span-2">
+            <Label htmlFor="cost-basis">Cost basis (USD)</Label>
+            <Input
+              id="cost-basis"
+              inputMode="decimal"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+              placeholder="What you paid for this bag"
+            />
+            <p className="text-xs text-muted-foreground">
+              Total dollars in, not per coin. Leave blank to keep auto-marking at the live price.
+            </p>
           </div>
         </div>
 

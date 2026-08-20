@@ -13,6 +13,8 @@ import {
   formatUsdCompact,
 } from "@/lib/format";
 import { unrealizedPnl } from "@/lib/pnl";
+import { veil } from "@/lib/privacy";
+import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { Change24 } from "@/components/change-24";
 import { PriceChart } from "@/components/price-chart";
@@ -228,16 +230,18 @@ function HoldingStrip({
   const remainUsd = price != null ? remain * price : null;
   const met = remain <= 0;
   const pnl = unrealizedPnl(holding.currentAmount, holding.costBasisUsd, price ?? undefined);
+  const { hidden: hideAmounts } = useHideAmounts();
   return (
     <section className="mt-6 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
       <p className="text-xs tracking-wide text-muted-foreground uppercase">Your target</p>
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <p className="font-mono text-sm tabular-nums">
-          {formatCoins(holding.currentAmount, holding.symbol)} / {formatCoins(holding.targetAmount, holding.symbol)}{" "}
-          {holding.symbol}
+          {hideAmounts
+            ? `${formatPercent(ratio)} of target`
+            : `${formatCoins(holding.currentAmount, holding.symbol)} / ${formatCoins(holding.targetAmount, holding.symbol)} ${holding.symbol}`}
         </p>
         <p className={met ? "font-serif text-2xl tracking-tight text-success" : "font-serif text-2xl tracking-tight tabular-nums"}>
-          {met ? "Target Hit" : remainUsd != null ? formatUsd(remainUsd) : formatPercent(ratio)}
+          {met ? "Target Hit" : hideAmounts ? formatPercent(ratio) : remainUsd != null ? formatUsd(remainUsd) : formatPercent(ratio)}
         </p>
       </div>
       <Progress
@@ -247,8 +251,14 @@ function HoldingStrip({
       />
       {pnl && (
         <p className={`mt-3 font-mono text-sm tabular-nums ${pnl.usd >= 0 ? "text-success" : "text-destructive"}`}>
-          Est. P/L {formatSignedUsd(pnl.usd, { precise: true })}
-          {pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""}
+          Est. P/L{" "}
+          {hideAmounts
+            ? pnl.ratio != null
+              ? formatSignedPercent(pnl.ratio)
+              : veil(true, "")
+            : `${formatSignedUsd(pnl.usd, { precise: true })}${
+                pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""
+              }`}
         </p>
       )}
     </section>

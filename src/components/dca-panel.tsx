@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { captureBaseline, defaultTargetDate, frequencyNoun, hasBaseline, quoteDca, sameSchedule } from "@/lib/dca";
 import { DcaChart } from "@/components/dca-chart";
 import { formatCoins, formatSignedPercent, formatSignedUsd, formatUsd, parseAmount } from "@/lib/format";
+import { veil } from "@/lib/privacy";
 import { planToDatePnl, unrealizedPnl } from "@/lib/pnl";
 import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ type Props = {
   holdings: Holding[];
   plans: DcaPlan[];
   prices: PriceMap;
+  hideAmounts?: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
   onSave: (input: {
@@ -30,7 +32,7 @@ type Props = {
   onClear: (planId: string) => Promise<void>;
 };
 
-export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave, onClear }: Props) {
+export function DcaPanel({ holdings, plans, prices, hideAmounts, selectedId, onSelect, onSave, onClear }: Props) {
   const holding = holdings.find((h) => h.id === selectedId) ?? holdings[0] ?? null;
   const existing = holding ? plans.find((p) => p.holdingId === holding.id) : undefined;
 
@@ -185,35 +187,49 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
                 ? "Target met"
                 : quote.pastDue
                   ? "Pick a future date"
-                  : quote.usdPerBuy != null
-                    ? formatUsd(quote.usdPerBuy, { precise: true })
-                    : `${formatCoins(quote.coinsPerBuy, holding.symbol)} ${holding.symbol}`
+                  : hideAmounts
+                    ? veil(true, "")
+                    : quote.usdPerBuy != null
+                      ? formatUsd(quote.usdPerBuy, { precise: true })
+                      : `${formatCoins(quote.coinsPerBuy, holding.symbol)} ${holding.symbol}`
             }
             hint={
               !quote.alreadyMet && !quote.pastDue
-                ? `${formatCoins(quote.coinsPerBuy, holding.symbol)} ${holding.symbol}`
+                ? hideAmounts
+                  ? undefined
+                  : `${formatCoins(quote.coinsPerBuy, holding.symbol)} ${holding.symbol}`
                 : undefined
             }
           />
           <Stat
             label="Buys remaining"
             value={quote.alreadyMet || quote.pastDue ? "—" : String(quote.periods)}
-            hint={quote.remainingUsd != null ? `${formatUsd(quote.remainingUsd)} left` : undefined}
+            hint={
+              quote.remainingUsd != null
+                ? hideAmounts
+                  ? undefined
+                  : `${formatUsd(quote.remainingUsd)} left`
+                : undefined
+            }
           />
           <Stat
             label="Price used"
-            value={quote.priceUsed != null ? formatUsd(quote.priceUsed, { precise: true }) : "Unavailable"}
+            value={
+              quote.priceUsed != null
+                ? veil(Boolean(hideAmounts), formatUsd(quote.priceUsed, { precise: true }))
+                : "Unavailable"
+            }
             hint={quote.usedAssumedPrice ? "Assumed" : "Live"}
           />
         </div>
       )}
 
       {existing && (
-        <PlanPnlRow holding={holding} plan={existing} price={prices[holding.coingeckoId]} />
+        <PlanPnlRow holding={holding} plan={existing} price={prices[holding.coingeckoId]} hideAmounts={hideAmounts} />
       )}
 
       {quote && quote.series.length > 1 && (
-        <DcaChart series={quote.series} milestones={quote.milestones} symbol={holding.symbol} />
+        <DcaChart series={quote.series} milestones={quote.milestones} symbol={holding.symbol} hideAmounts={hideAmounts} />
       )}
       {quote && quote.series.length <= 1 && !quote.alreadyMet && (
         <p className="mt-6 text-sm text-muted-foreground">
@@ -243,10 +259,12 @@ function PlanPnlRow({
   holding,
   plan,
   price,
+  hideAmounts,
 }: {
   holding: Holding;
   plan: DcaPlan;
   price?: number;
+  hideAmounts?: boolean;
 }) {
   const booked = unrealizedPnl(holding.currentAmount, holding.costBasisUsd, price);
   const scheduled = planToDatePnl(holding, plan, price);
@@ -256,16 +274,16 @@ function PlanPnlRow({
       {booked && (
         <Stat
           label="Booked P/L"
-          value={formatSignedUsd(booked.usd)}
-          hint={booked.ratio != null ? `${formatSignedPercent(booked.ratio)} vs cost` : "From holding updates"}
+          value={hideAmounts ? (booked.ratio != null ? formatSignedPercent(booked.ratio) : veil(true, "")) : formatSignedUsd(booked.usd)}
+          hint={booked.ratio != null && !hideAmounts ? `${formatSignedPercent(booked.ratio)} vs cost` : "From holding updates"}
           tone={booked.usd}
         />
       )}
       {scheduled && (
         <Stat
           label="If on schedule"
-          value={formatSignedUsd(scheduled.usd)}
-          hint={`${scheduled.buys} buys booked at plan price`}
+          value={hideAmounts ? veil(true, formatSignedUsd(scheduled.usd)) : formatSignedUsd(scheduled.usd)}
+          hint={hideAmounts ? `${scheduled.buys} buys` : `${scheduled.buys} buys booked at plan price`}
           tone={scheduled.usd}
         />
       )}

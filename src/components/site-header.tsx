@@ -1,6 +1,8 @@
 import { Link } from "@tanstack/react-router";
+import { Eye, EyeOff } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import type { AppView } from "@/lib/view";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
@@ -87,7 +89,27 @@ export function SiteHeader({ view = "ledger", onViewChange }: Props) {
           <span className="font-serif text-xl tracking-tight">Remaindr</span>
         </Link>
       </div>
-      <AuthSlot />
+      <div className="flex items-center gap-1">
+        <HideAmountsButton />
+        <AuthSlot />
+      </div>
     </header>
+  );
+}
+
+function HideAmountsButton() {
+  const { hidden, toggle } = useHideAmounts();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={toggle}
+      aria-pressed={hidden}
+      aria-label={hidden ? "Show amounts" : "Hide amounts"}
+      title={hidden ? "Show amounts" : "Hide amounts"}
+    >
+      {hidden ? <EyeOff /> : <Eye />}
+    </Button>
   );
 }

@@ -15,9 +15,10 @@ type Props = {
   series: DcaPoint[];
   milestones: DcaMilestone[];
   symbol: string;
+  hideAmounts?: boolean;
 };
 
-export function DcaChart({ series, milestones, symbol }: Props) {
+export function DcaChart({ series, milestones, symbol, hideAmounts }: Props) {
   if (series.length < 2) return null;
   const start = series[0];
   const end = series[series.length - 1];
@@ -75,11 +76,13 @@ export function DcaChart({ series, milestones, symbol }: Props) {
               axisLine={false}
               tickLine={false}
               width={52}
-              tickFormatter={(v) => formatCoins(Number(v), symbol)}
+              tickFormatter={(v) =>
+                hideAmounts ? formatPercent(end.target > 0 ? Number(v) / end.target : 0) : formatCoins(Number(v), symbol)
+              }
             />
             <Tooltip
               cursor={{ stroke: "var(--color-foreground)", strokeOpacity: 0.25 }}
-              content={<DcaTooltip symbol={symbol} />}
+              content={<DcaTooltip symbol={symbol} hideAmounts={hideAmounts} />}
             />
             {milestones.map((m) => (
               <ReferenceLine
@@ -123,20 +126,24 @@ function DcaTooltip({
   active,
   payload,
   symbol,
+  hideAmounts,
 }: {
   active?: boolean;
   payload?: { payload: DcaPoint }[];
   symbol: string;
+  hideAmounts?: boolean;
 }) {
   if (!active || !payload?.[0]) return null;
   const point = payload[0].payload;
   return (
     <div className="rounded-lg bg-popover px-3 py-2 shadow-[var(--shadow-border)]">
       <p className="font-serif text-lg tracking-tight">{point.fullDate}</p>
-      <p className="mt-1 font-mono text-sm tabular-nums">
-        {formatCoins(point.amount, symbol)} {symbol}
-      </p>
-      {point.usd != null && (
+      {!hideAmounts && (
+        <p className="mt-1 font-mono text-sm tabular-nums">
+          {formatCoins(point.amount, symbol)} {symbol}
+        </p>
+      )}
+      {point.usd != null && !hideAmounts && (
         <p className="text-sm tabular-nums text-muted-foreground">{formatUsd(point.usd)}</p>
       )}
       <p className="mt-1 text-xs text-muted-foreground">{formatPercent(point.fill)} of target</p>

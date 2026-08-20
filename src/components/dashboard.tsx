@@ -15,6 +15,8 @@ import {
 import type { Holding, HoldingInput } from "@/lib/types";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
+import { useHideAmounts } from "@/hooks/use-hide-amounts";
+import { veil } from "@/lib/privacy";
 import { AddHoldingDialog } from "@/components/add-holding-dialog";
 import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
@@ -33,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export function Dashboard() {
   const portfolio = usePortfolio();
   const { prices, changes, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
+  const { hidden: hideAmounts } = useHideAmounts();
   const [addOpen, setAddOpen] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
@@ -148,33 +151,53 @@ export function Dashboard() {
 
       <section className="mt-8 sm:mt-12">
         <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">
-          Remaining to hit targets
+          {hideAmounts ? "Filled toward targets" : "Remaining to hit targets"}
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
-            {totals.priced > 0 ? formatUsd(totals.remainUsd) : "—"}
+            {hideAmounts
+              ? formatPercent(totals.fill)
+              : totals.priced > 0
+                ? formatUsd(totals.remainUsd)
+                : "—"}
           </h1>
-          <p className="pb-1 font-mono text-sm tabular-nums text-muted-foreground">
-            {formatPercent(totals.fill)} filled
-          </p>
+          {!hideAmounts && (
+            <p className="pb-1 font-mono text-sm tabular-nums text-muted-foreground">
+              {formatPercent(totals.fill)} filled
+            </p>
+          )}
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <MiniStat label="Held" value={totals.priced > 0 ? formatUsd(totals.currentUsd) : "—"} />
-          <MiniStat label="Target value" value={totals.priced > 0 ? formatUsd(totals.targetUsd) : "—"} />
+          <MiniStat label="Held" value={totals.priced > 0 ? veil(hideAmounts, formatUsd(totals.currentUsd)) : "—"} />
+          <MiniStat
+            label="Target value"
+            value={totals.priced > 0 ? veil(hideAmounts, formatUsd(totals.targetUsd)) : "—"}
+          />
           <MiniStat
             label="Est. P/L"
-            value={totals.pnlUsd != null ? formatSignedUsd(totals.pnlUsd) : "—"}
-            valueClassName={
-              totals.pnlUsd == null ? undefined : totals.pnlUsd >= 0 ? "text-success" : "text-destructive"
+            value={
+              hideAmounts
+                ? totals.pnlRatio != null
+                  ? formatSignedPercent(totals.pnlRatio)
+                  : "—"
+                : totals.pnlUsd != null
+                  ? formatSignedUsd(totals.pnlUsd)
+                  : "—"
             }
-            hint={totals.pnlRatio != null ? formatSignedPercent(totals.pnlRatio) : "Marks on save"}
+            valueClassName={
+              totals.pnlUsd == null && totals.pnlRatio == null
+                ? undefined
+                : (totals.pnlUsd ?? 0) >= 0
+                  ? "text-success"
+                  : "text-destructive"
+            }
+            hint={hideAmounts ? "Amounts hidden" : totals.pnlRatio != null ? formatSignedPercent(totals.pnlRatio) : "Type cost on edit"}
           />
           <MiniStat label="Assets" value={String(holdings.length)} />
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Estimated P/L books each increase in current holdings at the live price when you save or refresh a
-          wallet. CEX fills are not imported. Bags already on the ledger were marked at the first live price after
-          this shipped.
+          P/L uses the cost basis you type on Edit amounts. If you leave it blank, new coins are marked at the live
+          price when you save or refresh a wallet. CEX fills are not imported.
         </p>
         {totals.slices.length > 0 && (
           <div className="mt-5">
@@ -187,14 +210,17 @@ export function Dashboard() {
                     width: `${Math.max(4, (slice.remainUsd / totals.remainUsd) * 100)}%`,
                     opacity: 0.45 + (slice.remainUsd / totals.remainUsd) * 0.55,
                   }}
-                  title={`${slice.symbol} ${formatUsd(slice.remainUsd)}`}
+                  title={`${slice.symbol}${hideAmounts ? "" : ` ${formatUsd(slice.remainUsd)}`}`}
                 />
               ))}
             </div>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               {totals.slices.map((slice) => (
                 <span key={slice.id} className="tabular-nums">
-                  {slice.symbol} {formatUsd(slice.remainUsd, { compact: true })}
+                  {slice.symbol}
+                  {hideAmounts
+                    ? ` ${formatPercent(totals.remainUsd > 0 ? slice.remainUsd / totals.remainUsd : 0)} of remainder`
+                    : ` ${formatUsd(slice.remainUsd, { compact: true })}`}
                 </span>
               ))}
             </div>
@@ -304,6 +330,7 @@ export function Dashboard() {
                 plan={portfolio.plans.find((p) => p.holdingId === holding.id)}
                 price={prices[holding.coingeckoId]}
                 change={changes?.[holding.coingeckoId]}
+                hideAmounts={hideAmounts}
                 onEdit={() => setEditing(holding)}
                 onPlan={() => {
                   setDcaId(holding.id);
@@ -321,6 +348,7 @@ export function Dashboard() {
           holdings={holdings}
           plans={portfolio.plans}
           prices={prices}
+          hideAmounts={hideAmounts}
           selectedId={dcaId}
           onSelect={setDcaId}
           onSave={(input) => portfolio.savePlan(input).then(() => undefined)}

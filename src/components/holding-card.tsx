@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
 import { formatCoins, formatPercent, formatSignedPercent, formatSignedUsd, formatUsd } from "@/lib/format";
+import { veil } from "@/lib/privacy";
 import { unrealizedPnl } from "@/lib/pnl";
 import type { DcaPlan, Holding } from "@/lib/types";
 import { Change24 } from "@/components/change-24";
@@ -25,9 +26,10 @@ type Props = {
   onEdit: () => void;
   onPlan: () => void;
   onDelete: () => void;
+  hideAmounts?: boolean;
 };
 
-export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete }: Props) {
+export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete, hideAmounts }: Props) {
   const navigate = useNavigate();
   const skipNav = useRef(false);
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
@@ -133,9 +135,15 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
 
       <div className="mt-5 flex items-end justify-between gap-3">
         <p className="font-mono text-sm tabular-nums text-muted-foreground">
-          <span className="text-foreground">{formatCoins(holding.currentAmount, holding.symbol)}</span>
-          {" / "}
-          {formatCoins(holding.targetAmount, holding.symbol)} {holding.symbol}
+          {hideAmounts ? (
+            <span className="text-foreground">{formatPercent(ratio)} of target</span>
+          ) : (
+            <>
+              <span className="text-foreground">{formatCoins(holding.currentAmount, holding.symbol)}</span>
+              {" / "}
+              {formatCoins(holding.targetAmount, holding.symbol)} {holding.symbol}
+            </>
+          )}
         </p>
         <p className="font-mono text-sm tabular-nums">{formatPercent(ratio)}</p>
       </div>
@@ -151,7 +159,7 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             <>
               <p className="text-xs tracking-wide text-success uppercase">Complete</p>
               <p className="font-serif text-3xl tracking-tight text-success">Target Hit</p>
-              {surplusUsd > 0.009 && (
+              {surplusUsd > 0.009 && !hideAmounts && (
                 <p className="mt-1 text-sm tabular-nums text-success/80">
                   {formatUsd(surplusUsd)} over target
                 </p>
@@ -159,15 +167,19 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             </>
           ) : (
             <>
-              <p className="text-xs tracking-wide text-muted-foreground uppercase">Capital remaining</p>
+              <p className="text-xs tracking-wide text-muted-foreground uppercase">
+                {hideAmounts ? "Progress" : "Capital remaining"}
+              </p>
               <p className="font-serif text-3xl tracking-tight tabular-nums">
-                {remainUsd != null
-                  ? formatUsd(remainUsd)
-                  : `${formatCoins(remain, holding.symbol)} ${holding.symbol}`}
+                {hideAmounts
+                  ? formatPercent(ratio)
+                  : remainUsd != null
+                    ? formatUsd(remainUsd)
+                    : `${formatCoins(remain, holding.symbol)} ${holding.symbol}`}
               </p>
             </>
           )}
-          {currentUsd != null && (
+          {currentUsd != null && !hideAmounts && (
             <p className="mt-1 text-sm text-muted-foreground tabular-nums">
               {formatUsd(currentUsd, { precise: true })} held
               {price != null ? ` at ${formatUsd(price, { precise: true })}` : ""}
@@ -177,8 +189,13 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
             <p
               className={`mt-1 font-mono text-sm tabular-nums ${pnl.usd >= 0 ? "text-success" : "text-destructive"}`}
             >
-              {formatSignedUsd(pnl.usd, { precise: true })}
-              {pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""}
+              {hideAmounts
+                ? pnl.ratio != null
+                  ? formatSignedPercent(pnl.ratio)
+                  : veil(true, "")
+                : `${formatSignedUsd(pnl.usd, { precise: true })}${
+                    pnl.ratio != null ? ` (${formatSignedPercent(pnl.ratio)})` : ""
+                  }`}
             </p>
           )}
         </div>

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { RotateCcw } from "lucide-react";
-import { formatUsd } from "@/lib/format";
+import { formatPercent, formatUsd } from "@/lib/format";
+import { fillRatio } from "@/lib/assets";
+import { veil } from "@/lib/privacy";
+import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import type { Holding } from "@/lib/types";
 import {
   draftFromPrice,
@@ -24,6 +27,7 @@ type Props = {
 export function WhatIfPage({ onBack }: Props) {
   const portfolio = usePortfolio();
   const { prices } = usePrices();
+  const { hidden: hideAmounts } = useHideAmounts();
   const [custom, setCustom] = useState<WhatIfPrices>(() => readWhatIfPrices());
   const [drafts, setDrafts] = useState<Record<string, string>>({});
 
@@ -103,20 +107,26 @@ export function WhatIfPage({ onBack }: Props) {
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
           <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
-            {totals.priced > 0 ? formatUsd(hopiumTarget) : "—"}
+            {hideAmounts
+              ? targetMult != null
+                ? formatMultiple(targetMult)
+                : "•••"
+              : totals.priced > 0
+                ? formatUsd(hopiumTarget)
+                : "—"}
           </h1>
           <p className="pb-1 font-mono text-sm text-muted-foreground tabular-nums">
-            {targetMult != null ? `${formatMultiple(targetMult)} vs live targets` : "set your prices"}
+            {hideAmounts ? "vs live targets" : targetMult != null ? `${formatMultiple(targetMult)} vs live targets` : "set your prices"}
           </p>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <MiniStat
             label="Held at your prices"
-            value={totals.priced > 0 ? formatUsd(hopiumHeld) : "—"}
+            value={totals.priced > 0 ? veil(hideAmounts, formatUsd(hopiumHeld)) : "—"}
           />
           <MiniStat
             label="Held at live"
-            value={totals.priced > 0 && liveHeld > 0 ? formatUsd(liveHeld) : "—"}
+            value={totals.priced > 0 && liveHeld > 0 ? veil(hideAmounts, formatUsd(liveHeld)) : "—"}
           />
           <MiniStat
             className="col-span-2 sm:col-span-1"
@@ -158,6 +168,7 @@ export function WhatIfPage({ onBack }: Props) {
                 draft={drafts[holding.coingeckoId] ?? ""}
                 live={prices[holding.coingeckoId]}
                 custom={custom}
+                hideAmounts={hideAmounts}
                 onChange={(raw) => setDraft(holding.coingeckoId, raw)}
               />
             ))}
@@ -173,15 +184,18 @@ function WhatIfCard({
   draft,
   live,
   custom,
+  hideAmounts,
   onChange,
 }: {
   holding: Holding;
   draft: string;
   live?: number;
   custom: WhatIfPrices;
+  hideAmounts?: boolean;
   onChange: (raw: string) => void;
 }) {
   const row = scenarioForHolding(holding, live, custom);
+  const ratio = fillRatio(holding.currentAmount, holding.targetAmount);
   return (
     <article className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -220,9 +234,9 @@ function WhatIfCard({
         <div>
           <p className="text-xs tracking-wide text-muted-foreground uppercase">Held now</p>
           <p className="mt-1 font-serif text-2xl tracking-tight tabular-nums">
-            {row.heldYours != null ? formatUsd(row.heldYours) : "—"}
+            {hideAmounts ? formatPercent(ratio) : row.heldYours != null ? formatUsd(row.heldYours) : "—"}
           </p>
-          {row.heldLive != null && (
+          {row.heldLive != null && !hideAmounts && (
             <p className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
               live {formatUsd(row.heldLive)}
             </p>
@@ -231,9 +245,15 @@ function WhatIfCard({
         <div>
           <p className="text-xs tracking-wide text-muted-foreground uppercase">At target</p>
           <p className="mt-1 font-serif text-2xl tracking-tight tabular-nums">
-            {row.targetYours != null ? formatUsd(row.targetYours) : "—"}
+            {hideAmounts
+              ? row.multiple != null
+                ? formatMultiple(row.multiple)
+                : "•••"
+              : row.targetYours != null
+                ? formatUsd(row.targetYours)
+                : "—"}
           </p>
-          {row.targetLive != null && (
+          {row.targetLive != null && !hideAmounts && (
             <p className="mt-0.5 font-mono text-xs tabular-nums text-muted-foreground">
               live {formatUsd(row.targetLive)}
             </p>

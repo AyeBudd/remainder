@@ -229,11 +229,12 @@ export function usePortfolio() {
             : patch.currentAmount ?? walletAmount + manualAmount;
         const source =
           walletAmount > 0 && manualAmount > 0 ? "mixed" : walletAmount > 0 ? "wallet" : "manual";
-        const costBasisUsd = patch.markPrice
-          ? rollCostBasis(h.currentAmount, patch.costBasisUsd !== undefined ? patch.costBasisUsd : h.costBasisUsd, currentAmount, patch.markPrice)
-          : patch.costBasisUsd !== undefined
+        const costBasisUsd =
+          patch.costBasisUsd !== undefined
             ? patch.costBasisUsd
-            : h.costBasisUsd;
+            : patch.markPrice
+              ? rollCostBasis(h.currentAmount, h.costBasisUsd, currentAmount, patch.markPrice)
+              : h.costBasisUsd;
         updated = { ...h, ...patch, walletAmount, manualAmount, currentAmount, source, costBasisUsd };
         return updated;
       });

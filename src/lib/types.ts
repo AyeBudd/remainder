@@ -19,7 +19,10 @@ export type LinkedWallet = {
   label: string | null;
 };
 
-export type HoldingInput = Omit<Holding, "id"> & { markPrice?: number };
+export type HoldingInput = Omit<Holding, "id" | "costBasisUsd"> & {
+  markPrice?: number;
+  costBasisUsd?: number | null;
+};
 
 export type DcaFrequency = "daily" | "weekly" | "biweekly" | "monthly";
 
