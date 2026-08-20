@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { MoreHorizontal, Route } from "lucide-react";
 import { fillRatio, remainingCoins } from "@/lib/assets";
 import { formatCoins, formatPercent, formatUsd } from "@/lib/format";
@@ -26,6 +26,7 @@ type Props = {
 };
 
 export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDelete }: Props) {
+  const navigate = useNavigate();
   const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
   const ratio = fillRatio(holding.currentAmount, holding.targetAmount);
   const currentUsd = price != null ? holding.currentAmount * price : null;
@@ -36,21 +37,28 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
       ? currentUsd - holding.targetAmount * price
       : 0;
 
+  const openAsset = () => {
+    void navigate({ to: "/asset/$id", params: { id: holding.coingeckoId } });
+  };
+
   return (
     <article
+      role="link"
+      tabIndex={0}
+      aria-label={`${holding.symbol} market`}
+      onClick={openAsset}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          openAsset();
+        }
+      }}
       className={
         met
-          ? "relative rounded-xl bg-success/20 p-4 outline outline-1 outline-success/45 transition-colors hover:bg-success/25 sm:p-5"
-          : "relative rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-colors hover:bg-secondary/40 sm:p-5"
+          ? "cursor-pointer rounded-xl bg-success/20 p-4 outline outline-1 outline-success/45 transition-colors hover:bg-success/25 sm:p-5"
+          : "cursor-pointer rounded-xl bg-card p-4 shadow-[var(--shadow-border)] transition-colors hover:bg-secondary/40 sm:p-5"
       }
     >
-      <Link
-        to="/asset/$id"
-        params={{ id: holding.coingeckoId }}
-        className="absolute inset-0 z-0 rounded-xl"
-        aria-label={`${holding.symbol} market`}
-      />
-      <div className="relative z-10">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-baseline gap-2">
@@ -138,7 +146,6 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
         <Button
           variant="outline"
           size="sm"
-          className="relative z-10"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -148,7 +155,6 @@ export function HoldingCard({ holding, plan, price, change, onEdit, onPlan, onDe
           <Route />
           Plan path
         </Button>
-      </div>
       </div>
     </article>
   );
