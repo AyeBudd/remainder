@@ -289,13 +289,13 @@ function PrefRow({
         aria-checked={on}
         disabled={disabled}
         onClick={onToggle}
-        className={`relative mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
-          on ? "bg-primary" : "bg-muted-foreground/30"
+        className={`h-7 w-11 shrink-0 overflow-hidden rounded-full p-0.5 transition-colors ${
+          on ? "bg-primary" : "bg-input"
         }`}
       >
         <span
-          className={`absolute top-1 size-5 rounded-full bg-primary-foreground transition-transform ${
-            on ? "translate-x-6" : "translate-x-1"
+          className={`block size-6 rounded-full shadow-sm transition-transform duration-150 ease-out ${
+            on ? "translate-x-4 bg-primary-foreground" : "translate-x-0 bg-foreground"
           }`}
         />
       </button>
