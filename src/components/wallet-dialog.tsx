@@ -101,7 +101,7 @@ export function WalletDialog({ open, onOpenChange, holdings, onApply, onAddFromW
         <DialogHeader>
           <DialogTitle>Connect a wallet</DialogTitle>
           <DialogDescription>
-            Read-only. Remainder asks for your address and token balances on Ethereum — never a transaction, never your keys.
+            Read-only. Remaindr asks for your address and token balances on Ethereum — never a transaction, never your keys.
           </DialogDescription>
         </DialogHeader>
 

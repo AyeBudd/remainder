@@ -1,10 +1,10 @@
-# Remainder
+# Remaindr
 
-**Live site:** [ayebudd.github.io/remainder](https://ayebudd.github.io/remainder/)
+**Live site:** [remainder-gray.vercel.app](https://remainder-gray.vercel.app) · domain: remaindr.xyz
 
 Set crypto target holdings, see the capital left to hit them, and plan a DCA path.
 
-Holdings can be typed in (CEX or private) or imported read-only from an Ethereum wallet. Remainder never asks you to sign a transaction.
+Holdings can be typed in (CEX or private) or imported read-only from an Ethereum wallet. Remaindr never asks you to sign a transaction.
 
 The public GitHub Pages site is the same ledger you see in preview — guest mode, live prices, wallet import, and DCA planning. Sign-in to save a stack across devices needs the full server app below.
 

@@ -80,7 +80,7 @@ export function SiteHeader({ view = "ledger", onViewChange }: Props) {
           onClick={() => onViewChange?.("ledger")}
         >
           <Mark />
-          <span className="font-serif text-xl tracking-tight">Remainder</span>
+          <span className="font-serif text-xl tracking-tight">Remaindr</span>
         </button>
       </div>
       <AuthSlot />

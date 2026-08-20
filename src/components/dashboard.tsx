@@ -347,7 +347,7 @@ function EmptyState({
       <h3 className="font-serif text-3xl tracking-tight">Set the first mark</h3>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
         Name an asset, a target stack, and what you already hold — wallet or typed in.
-        Remainder shows the capital left, then a path to fill it.
+        Remaindr shows the capital left, then a path to fill it.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <Button onClick={onAdd}>

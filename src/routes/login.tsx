@@ -78,7 +78,7 @@ function Login() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
       <Link to="/" className="font-serif text-2xl tracking-tight">
-        Remainder
+        Remaindr
       </Link>
       <h1 className="mt-10 font-serif text-4xl tracking-tight">
         {mode === "up" ? "Create account" : "Sign in"}

@@ -4,7 +4,7 @@ function headerHtml(){
       <button class="btn btn-ghost btn-icon" data-act="nav" aria-label="Open pages" aria-expanded="${state.navOpen?"true":"false"}" aria-controls="app-pages">${I.menu}</button>
       <button type="button" class="brand" data-act="page" data-page="ledger">
         <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><rect x="2" y="10" width="20" height="4" rx="2" fill="#3a3b38"/><rect x="2" y="10" width="13" height="4" rx="2" fill="#f0efe8"/></svg>
-        <span>Remainder</span>
+        <span>Remaindr</span>
       </button>
     </div>
     <button class="btn btn-outline" data-act="signin">Sign in</button>
@@ -62,7 +62,7 @@ function render(){
   root.innerHTML = `
   <div class="wrap">
     ${headerHtml()}
-    <p class="banner">This stack stays in this browser. <button type="button" data-act="signin">Sign in</button> to save it to your account — available when you host Remainder with a database.</p>
+    <p class="banner">This stack stays in this browser. <button type="button" data-act="signin">Sign in</button> to save it to your account — available when you host Remaindr with a database.</p>
     <section class="hero">
       <p class="kicker">Remaining to hit targets</p>
       <div class="hero-row">
@@ -103,7 +103,7 @@ function render(){
       ${noticesHtml()}
       ${state.holdings.length===0 ? `<div class="empty">
         <h3>Set the first mark</h3>
-        <p>Name an asset, a target stack, and what you already hold — wallet or typed in. Remainder shows the capital left, then a path to fill it.</p>
+        <p>Name an asset, a target stack, and what you already hold — wallet or typed in. Remaindr shows the capital left, then a path to fill it.</p>
         <div class="actions">
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
           <button class="btn btn-outline" data-act="sample">Use sample stack</button>
@@ -349,7 +349,7 @@ function dialogHtml(){
   if (d.type==="signin") return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="si-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="si-title">Sign in</h2>
-    <p class="desc">This public GitHub Pages build keeps your ledger in this browser. Google / X account save needs Remainder hosted with a database (the full app in this repo).</p>
+    <p class="desc">This public GitHub Pages build keeps your ledger in this browser. Google / X account save needs Remaindr hosted with a database (the full app in this repo).</p>
     <div class="actions" style="margin-top:1.25rem;justify-content:flex-end"><button class="btn btn-primary" data-close="1">Keep it local</button></div>
   </div></div>`;
   if (d.type==="wallet") {
@@ -358,7 +358,7 @@ function dialogHtml(){
     return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="w-title">
       <button class="x" data-close="1" aria-label="Close">${I.x}</button>
       <h2 id="w-title">Connect a wallet</h2>
-      <p class="desc">Read-only. Remainder asks for your address and token balances on Ethereum — never a transaction, never your keys.</p>
+      <p class="desc">Read-only. Remaindr asks for your address and token balances on Ethereum — never a transaction, never your keys.</p>
       ${!available?`<p class="banner" style="margin-top:1rem">No injected wallet in this browser. Holdings on a CEX, a hardware wallet, or another chain can be typed in manually.</p>`:""}
       ${available && !w.address ? `<div style="margin-top:1rem"><button class="btn btn-primary" data-act="connect" ${w.busy?"disabled":""}>${I.wallet} ${w.busy?"Connecting…":"Connect Ethereum wallet"}</button></div>`:""}
       ${w.address ? `<div style="margin-top:1rem">
