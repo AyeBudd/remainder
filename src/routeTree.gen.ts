@@ -10,12 +10,19 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AccountRouteImport } from './routes/account'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiCronDcaAlertsRouteImport } from './routes/api/cron/dca-alerts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AccountRoute = AccountRouteImport.update({
+  id: '/account',
+  path: '/account',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -28,35 +35,55 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCronDcaAlertsRoute = ApiCronDcaAlertsRouteImport.update({
+  id: '/api/cron/dca-alerts',
+  path: '/api/cron/dca-alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/login': typeof LoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/login': typeof LoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/account': typeof AccountRoute
   '/login': typeof LoginRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/cron/dca-alerts': typeof ApiCronDcaAlertsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/api/auth/$'
+  fullPaths:
+    '/' | '/account' | '/login' | '/api/auth/$' | '/api/cron/dca-alerts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/api/auth/$'
-  id: '__root__' | '/' | '/login' | '/api/auth/$'
+  to: '/' | '/account' | '/login' | '/api/auth/$' | '/api/cron/dca-alerts'
+  id:
+    | '__root__'
+    | '/'
+    | '/account'
+    | '/login'
+    | '/api/auth/$'
+    | '/api/cron/dca-alerts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AccountRoute: typeof AccountRoute
   LoginRoute: typeof LoginRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiCronDcaAlertsRoute: typeof ApiCronDcaAlertsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +93,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/account': {
+      id: '/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AccountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -82,13 +116,22 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cron/dca-alerts': {
+      id: '/api/cron/dca-alerts'
+      path: '/api/cron/dca-alerts'
+      fullPath: '/api/cron/dca-alerts'
+      preLoaderRoute: typeof ApiCronDcaAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AccountRoute: AccountRoute,
   LoginRoute: LoginRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiCronDcaAlertsRoute: ApiCronDcaAlertsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

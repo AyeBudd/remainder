@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/cron/dca-alerts",
+      "schedule": "0 14 * * *"
+    }
+  ]
 }

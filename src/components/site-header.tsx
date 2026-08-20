@@ -58,6 +58,10 @@ function AuthSlot() {
       <DropdownMenuContent align="end">
         <div className="px-3 py-2 text-xs text-muted-foreground">Signed in</div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/account">Account settings</Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void signOut("/")}>Sign out</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -74,14 +78,14 @@ export function SiteHeader({ view = "ledger", onViewChange }: Props) {
     <header className="flex h-16 items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-1">
         {onViewChange && <AppNav view={view} onChange={onViewChange} />}
-        <button
-          type="button"
-          className="flex items-center gap-2.5 bg-transparent text-foreground"
+        <Link
+          to="/"
+          className="flex items-center gap-2.5 text-foreground"
           onClick={() => onViewChange?.("ledger")}
         >
           <Mark />
           <span className="font-serif text-xl tracking-tight">Remaindr</span>
-        </button>
+        </Link>
       </div>
       <AuthSlot />
     </header>
