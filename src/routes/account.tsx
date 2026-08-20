@@ -240,7 +240,7 @@ function AccountPage() {
           <div className="mt-5 space-y-3">
             <PrefRow
               title="Newsletter"
-              hint="Occasional product notes. No spam cadence yet — this stores the opt-in."
+              hint="Friday brief at 9:00 a.m. Eastern. Facts only — no price calls."
               on={Boolean(prefs?.newsletter)}
               disabled={!prefs || busy === "prefs"}
               onToggle={() => void togglePref({ newsletter: !prefs?.newsletter })}

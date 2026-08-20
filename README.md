@@ -58,6 +58,7 @@ GitHub Pages is guest-only. Accounts need the full app on Vercel plus a Postgres
 | `RESEND_API_KEY` | Resend API key so newsletter confirms and DCA warnings can send |
 | `EMAIL_FROM` | e.g. `Remaindr <alerts@remaindr.xyz>` (must be a verified Resend domain) |
 | `CRON_SECRET` | Random string; Vercel Cron sends it as `Authorization: Bearer …` |
+| `XAI_API_KEY` | xAI key so Friday’s newsletter can be written from current headlines |
 
 5. Deploy. Vercel gives you a URL like `https://remainder-xxxx.vercel.app`.
 6. Put that URL in `BETTER_AUTH_URL` and redeploy once.

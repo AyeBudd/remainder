@@ -14,4 +14,9 @@ export const APP_PAGES = [
     label: "BTC tracker",
     hint: "Price, halving, ATH, cycle low",
   },
+  {
+    id: "news" as const,
+    label: "Newsletter",
+    hint: "Facts only. Major items, top 50.",
+  },
 ];

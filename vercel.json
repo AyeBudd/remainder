@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/dca-alerts",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/cron/newsletter",
+      "schedule": "0 13 * * 5"
     }
   ]
 }

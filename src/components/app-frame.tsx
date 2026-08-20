@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { BtcTrackerPage } from "@/components/btc-tracker-page";
 import { Dashboard } from "@/components/dashboard";
+import { NewsletterPage } from "@/components/newsletter-page";
 import { SiteHeader } from "@/components/site-header";
 import { WhatIfPage } from "@/components/what-if-page";
 import { readAppView, writeAppView, type AppView } from "@/lib/view";
@@ -29,6 +30,8 @@ export function AppFrame() {
         <WhatIfPage onBack={() => choose("ledger")} />
       ) : view === "btc" ? (
         <BtcTrackerPage />
+      ) : view === "news" ? (
+        <NewsletterPage />
       ) : (
         <Dashboard />
       )}

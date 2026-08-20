@@ -1,7 +1,7 @@
-export type AppView = "ledger" | "what-if" | "btc";
+export type AppView = "ledger" | "what-if" | "btc" | "news";
 
 const VIEW_KEY = "remainder.view";
-const VIEWS = new Set<AppView>(["ledger", "what-if", "btc"]);
+const VIEWS = new Set<AppView>(["ledger", "what-if", "btc", "news"]);
 
 export function parseAppView(raw: string | null | undefined): AppView {
   if (raw && VIEWS.has(raw as AppView)) return raw as AppView;
