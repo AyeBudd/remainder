@@ -400,6 +400,7 @@ async function loadPrices(force){
     }
   } finally {
     state.priceBusy = false;
+    hydrateBaselines();
     render();
   }
 }
@@ -534,12 +535,75 @@ function savePlan(){
   if (state.form.assumed?.trim() && (assumed==null || assumed<=0)) { state.form.err="Assumed price must be a positive number, or left blank."; render(); return; }
   const existing = state.plans.find(p=>p.holdingId===h.id);
   const next = { id: existing?.id || uid(), holdingId:h.id, targetDate: state.form.date, frequency: state.form.freq, assumed };
+  const same = existing && existing.targetDate===next.targetDate && existing.frequency===next.frequency && existing.assumed===next.assumed && existing.baselineDays>0 && existing.baselineUsdPerBuy>0;
+  if (same) {
+    next.baselineAt = existing.baselineAt;
+    next.baselineDays = existing.baselineDays;
+    next.baselineUsdPerBuy = existing.baselineUsdPerBuy;
+    next.baselinePrice = existing.baselinePrice;
+    next.baselineRemaining = existing.baselineRemaining;
+  } else {
+    Object.assign(next, capturePlanBaseline(h, next));
+  }
   state.plans = [...state.plans.filter(p=>p.holdingId!==h.id), next];
   persist(); render();
 }
 function clearPlan(id){ state.plans = state.plans.filter(p=>p.id!==id); persist(); render(); }
 function currentDca(){
   return state.holdings.find(h=>h.id===state.dcaId) || state.holdings[0] || null;
+}
+function periodDays(freq){
+  if (freq==="daily") return 1;
+  if (freq==="weekly") return 7;
+  if (freq==="biweekly") return 14;
+  return 365/12;
+}
+function capturePlanBaseline(h, plan){
+  const q = quoteDca(h, plan);
+  const now = new Date();
+  const days = Math.max(1, Math.round((startDay(new Date(plan.targetDate+"T00:00:00"))-startDay(now))/86400000));
+  return {
+    baselineAt: iso(now),
+    baselineDays: days,
+    baselineUsdPerBuy: q.usd,
+    baselinePrice: q.price,
+    baselineRemaining: q.rem,
+  };
+}
+function hydrateBaselines(){
+  let changed = false;
+  state.plans = state.plans.map(function(p){
+    if (p.baselineDays>0 && p.baselineUsdPerBuy>0) return p;
+    const h = state.holdings.find(x=>x.id===p.holdingId);
+    if (!h) return p;
+    const snap = capturePlanBaseline(h, p);
+    if (!(snap.baselineUsdPerBuy>0)) return p;
+    changed = true;
+    return Object.assign({}, p, snap);
+  });
+  if (changed) persist();
+}
+function assessPlan(h, plan){
+  const rem = remain(h.current, h.target);
+  if (rem<=0) return null;
+  if (!(plan.baselineDays>0 && plan.baselineUsdPerBuy>0)) return null;
+  const price = plan.assumed>0 ? plan.assumed : state.prices[h.idg];
+  if (!(price>0)) return null;
+  const implied = (rem * price / plan.baselineUsdPerBuy) * periodDays(plan.frequency);
+  const change = (implied - plan.baselineDays) / plan.baselineDays;
+  return { off: Math.abs(change) >= 0.25, change };
+}
+function noticesHtml(){
+  const items = [];
+  for (const p of state.plans) {
+    const h = state.holdings.find(x=>x.id===p.holdingId);
+    if (!h) continue;
+    const a = assessPlan(h, p);
+    if (!a) continue;
+    items.push({ h, a });
+  }
+  if (!items.length && !state.plans.length) return "";
+  return `<div class="notices">${items.map(({h,a})=>`<div class="note ${a.off?"note-bad":"note-ok"}">${state.holdings.length>1?esc(h.symbol)+" · ":""}${a.off?"Recommend re-evaluating DCA due to price change":"Current DCA plan on schedule"}</div>`).join("")}${state.plans.length?`<p class="fine">A 25% change in estimated time to target from when the plan was originally set will trigger this warning. Planning check only — not financial advice.</p>`:""}</div>`;
 }
 function syncForm(){
   const h = currentDca();

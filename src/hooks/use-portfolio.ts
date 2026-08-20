@@ -10,7 +10,8 @@ import {
   updateHolding,
   upsertDcaPlan,
 } from "@/lib/holdings";
-import type { DcaPlan, DcaPlanInput, Holding, HoldingInput } from "@/lib/types";
+import { captureBaseline, hasBaseline } from "@/lib/dca";
+import type { DcaPlan, DcaPlanInput, Holding, HoldingInput, PriceMap } from "@/lib/types";
 
 const LOCAL_KEY = "remainder.v1";
 
@@ -193,6 +194,27 @@ export function usePortfolio() {
     return saved;
   };
 
+  const ensureBaselines = useCallback(
+    (prices: PriceMap) => {
+      setPlans((prev) => {
+        let changed = false;
+        const next = prev.map((plan) => {
+          if (hasBaseline(plan)) return plan;
+          const holding = holdings.find((h) => h.id === plan.holdingId);
+          if (!holding) return plan;
+          const snap = captureBaseline(holding, plan, prices);
+          if (!snap.baselineUsdPerBuy) return plan;
+          changed = true;
+          return { ...plan, ...snap };
+        });
+        if (!changed) return prev;
+        if (!user) persistGuest(holdings ?? [], next);
+        return next;
+      });
+    },
+    [holdings, user],
+  );
+
   const removePlan = async (id: string) => {
     if (user) {
       await deleteDcaPlan({ data: id });
@@ -221,6 +243,7 @@ export function usePortfolio() {
     update,
     remove,
     savePlan,
+    ensureBaselines,
     removePlan,
     loadSample,
     reload,

@@ -89,6 +89,11 @@
     .section { margin-top: 2.5rem; }
     .section-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; }
     .section-head h2 { font-family: var(--serif); font-size: 1.5rem; letter-spacing: -0.02em; font-weight: 400; }
+    .notices { margin-top: 1.5rem; display: grid; gap: 0.5rem; }
+    .note { border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500; }
+    .note-ok { background: rgb(125 154 120 / 0.15); color: var(--success); }
+    .note-bad { background: rgb(196 92 74 / 0.15); color: var(--danger); }
+    .fine { margin: 0; font-size: 11px; line-height: 1.45; color: var(--muted); }
     .actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .grid { margin-top: 1rem; display: grid; gap: 0.75rem; }
     @media (min-width: 768px) { .grid { grid-template-columns: 1fr 1fr; } }
@@ -238,9 +243,9 @@
 </head>
 <body>
   <div id="app"></div>
-  <script src="./app-catalog.js?v=10"></script>
-  <script src="./app-core.js?v=10"></script>
-  <script src="./app-ui.js?v=10"></script>
+  <script src="./app-catalog.js?v=11"></script>
+  <script src="./app-core.js?v=11"></script>
+  <script src="./app-ui.js?v=11"></script>
 
 </body>
 </html>

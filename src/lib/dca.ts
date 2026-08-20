@@ -220,3 +220,84 @@ export function quoteDca(
 export function defaultTargetDate(monthsAhead = 6): string {
   return format(addMonths(new Date(), monthsAhead), "yyyy-MM-dd");
 }
+
+const PERIOD_DAYS: Record<DcaFrequency, number> = {
+  daily: 1,
+  weekly: 7,
+  biweekly: 14,
+  monthly: 365 / 12,
+};
+
+export const DCA_ETA_WARN = 0.25;
+
+export type DcaBaseline = {
+  baselineAt: string;
+  baselineDays: number;
+  baselineUsdPerBuy: number | null;
+  baselinePrice: number | null;
+  baselineRemaining: number;
+};
+
+export function captureBaseline(
+  holding: Holding,
+  plan: Pick<DcaPlan, "targetDate" | "frequency" | "assumedPrice">,
+  prices: PriceMap,
+  now = new Date(),
+): DcaBaseline {
+  const quote = quoteDca(holding, plan, prices, now);
+  const days = Math.max(1, differenceInCalendarDays(startOfDay(parseISO(plan.targetDate)), startOfDay(now)));
+  return {
+    baselineAt: format(now, "yyyy-MM-dd"),
+    baselineDays: days,
+    baselineUsdPerBuy: quote.usdPerBuy,
+    baselinePrice: quote.priceUsed,
+    baselineRemaining: quote.remainingCoins,
+  };
+}
+
+export function hasBaseline(plan: DcaPlan): boolean {
+  return Boolean(plan.baselineDays && plan.baselineDays > 0 && plan.baselineUsdPerBuy && plan.baselineUsdPerBuy > 0);
+}
+
+export function sameSchedule(a: DcaPlan, b: Pick<DcaPlan, "targetDate" | "frequency" | "assumedPrice">): boolean {
+  return (
+    a.targetDate === b.targetDate &&
+    a.frequency === b.frequency &&
+    (a.assumedPrice ?? null) === (b.assumedPrice ?? null)
+  );
+}
+
+export type DcaPace = {
+  status: "on-track" | "off-track" | "met" | "unknown";
+  change: number | null;
+  impliedDays: number | null;
+};
+
+export function assessDcaPace(
+  holding: Holding,
+  plan: DcaPlan,
+  prices: PriceMap,
+  now = new Date(),
+): DcaPace {
+  const remain = remainingCoins(holding.currentAmount, holding.targetAmount);
+  if (remain <= 0) return { status: "met", change: 0, impliedDays: 0 };
+  if (!hasBaseline(plan)) return { status: "unknown", change: null, impliedDays: null };
+  const live = prices[holding.coingeckoId];
+  const price =
+    plan.assumedPrice && plan.assumedPrice > 0
+      ? plan.assumedPrice
+      : Number.isFinite(live)
+        ? live
+        : null;
+  if (!(price != null && price > 0) || !plan.baselineUsdPerBuy || !plan.baselineDays) {
+    return { status: "unknown", change: null, impliedDays: null };
+  }
+  const remainUsd = remain * price;
+  const impliedDays = (remainUsd / plan.baselineUsdPerBuy) * PERIOD_DAYS[plan.frequency];
+  const change = (impliedDays - plan.baselineDays) / plan.baselineDays;
+  return {
+    status: Math.abs(change) >= DCA_ETA_WARN ? "off-track" : "on-track",
+    change,
+    impliedDays,
+  };
+}

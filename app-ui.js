@@ -100,6 +100,7 @@ function render(){
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
         </div>
       </div>
+      ${noticesHtml()}
       ${state.holdings.length===0 ? `<div class="empty">
         <h3>Set the first mark</h3>
         <p>Name an asset, a target stack, and what you already hold — wallet or typed in. Remainder shows the capital left, then a path to fill it.</p>

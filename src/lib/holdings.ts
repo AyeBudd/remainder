@@ -28,6 +28,7 @@ type PlanRow = {
   target_date: string;
   frequency: string;
   assumed_price: string | number | null;
+  baseline?: unknown;
 };
 
 function toHolding(row: HoldingRow): Holding {
@@ -44,13 +45,48 @@ function toHolding(row: HoldingRow): Holding {
 }
 
 function toPlan(row: PlanRow): DcaPlan {
+  const base = parseBaseline(row.baseline);
   return {
     id: String(row.id),
     holdingId: String(row.holding_id),
     targetDate: String(row.target_date).slice(0, 10),
     frequency: row.frequency as DcaFrequency,
     assumedPrice: row.assumed_price == null ? null : num(row.assumed_price),
+    ...base,
   };
+}
+
+function parseBaseline(raw: unknown): Partial<DcaPlan> {
+  if (!raw || typeof raw !== "object") return {};
+  const o = raw as Record<string, unknown>;
+  const days = num(o.baselineDays as string | number);
+  const usd = num(o.baselineUsdPerBuy as string | number);
+  return {
+    baselineAt: typeof o.baselineAt === "string" ? o.baselineAt : null,
+    baselineDays: days > 0 ? days : null,
+    baselineUsdPerBuy: usd > 0 ? usd : null,
+    baselinePrice: o.baselinePrice == null ? null : num(o.baselinePrice as string | number),
+    baselineRemaining: o.baselineRemaining == null ? null : num(o.baselineRemaining as string | number),
+  };
+}
+
+function baselineJson(data: {
+  baselineAt?: string | null;
+  baselineDays?: number | null;
+  baselineUsdPerBuy?: number | null;
+  baselinePrice?: number | null;
+  baselineRemaining?: number | null;
+}): string | null {
+  if (!(data.baselineDays && data.baselineDays > 0 && data.baselineUsdPerBuy && data.baselineUsdPerBuy > 0)) {
+    return null;
+  }
+  return JSON.stringify({
+    baselineAt: data.baselineAt ?? null,
+    baselineDays: data.baselineDays,
+    baselineUsdPerBuy: data.baselineUsdPerBuy,
+    baselinePrice: data.baselinePrice ?? null,
+    baselineRemaining: data.baselineRemaining ?? null,
+  });
 }
 
 const holdingInput = z.object({
@@ -76,6 +112,11 @@ const planInput = z.object({
   targetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   frequency: z.enum(["daily", "weekly", "biweekly", "monthly"]),
   assumedPrice: z.number().positive().nullable(),
+  baselineAt: z.string().nullable().optional(),
+  baselineDays: z.number().positive().nullable().optional(),
+  baselineUsdPerBuy: z.number().positive().nullable().optional(),
+  baselinePrice: z.number().positive().nullable().optional(),
+  baselineRemaining: z.number().min(0).nullable().optional(),
 });
 
 export const listHoldings = createServerFn({ method: "GET" })
@@ -96,7 +137,7 @@ export const listDcaPlans = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const sql = await getSql();
     const rows = await sql<PlanRow>`
-      select id, holding_id, target_date, frequency, assumed_price
+      select id, holding_id, target_date, frequency, assumed_price, baseline
       from dca_plans
       where user_id = ${context.userId}
     `;
@@ -178,15 +219,17 @@ export const upsertDcaPlan = createServerFn({ method: "POST" })
       select id from holdings where id = ${holdingId} and user_id = ${context.userId}
     `;
     if (!owned[0]) throw new Error("Holding not found");
+    const baseline = baselineJson(data);
     const rows = await sql<PlanRow>`
-      insert into dca_plans (user_id, holding_id, target_date, frequency, assumed_price)
-      values (${context.userId}, ${holdingId}, ${data.targetDate}, ${data.frequency}, ${data.assumedPrice})
+      insert into dca_plans (user_id, holding_id, target_date, frequency, assumed_price, baseline)
+      values (${context.userId}, ${holdingId}, ${data.targetDate}, ${data.frequency}, ${data.assumedPrice}, ${baseline}::jsonb)
       on conflict (holding_id) do update set
         target_date = excluded.target_date,
         frequency = excluded.frequency,
         assumed_price = excluded.assumed_price,
+        baseline = excluded.baseline,
         updated_at = now()
-      returning id, holding_id, target_date, frequency, assumed_price
+      returning id, holding_id, target_date, frequency, assumed_price, baseline
     `;
     const row = rows[0];
     if (!row) throw new Error("Failed to save plan");

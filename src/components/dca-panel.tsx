@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { defaultTargetDate, frequencyNoun, quoteDca } from "@/lib/dca";
+import { captureBaseline, defaultTargetDate, frequencyNoun, hasBaseline, quoteDca, sameSchedule } from "@/lib/dca";
 import { DcaChart } from "@/components/dca-chart";
 import { formatCoins, formatUsd, parseAmount } from "@/lib/format";
 import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "@/lib/types";
@@ -85,6 +85,17 @@ export function DcaPanel({ holdings, plans, prices, selectedId, onSelect, onSave
         targetDate,
         frequency,
         assumedPrice,
+        ...(existing &&
+        hasBaseline(existing) &&
+        sameSchedule(existing, { targetDate, frequency, assumedPrice })
+          ? {
+              baselineAt: existing.baselineAt,
+              baselineDays: existing.baselineDays,
+              baselineUsdPerBuy: existing.baselineUsdPerBuy,
+              baselinePrice: existing.baselinePrice,
+              baselineRemaining: existing.baselineRemaining,
+            }
+          : captureBaseline(holding, { targetDate, frequency, assumedPrice }, prices)),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save plan");

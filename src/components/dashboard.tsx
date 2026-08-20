@@ -14,6 +14,7 @@ import type { Holding, HoldingInput } from "@/lib/types";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
 import { AddHoldingDialog } from "@/components/add-holding-dialog";
+import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
 import { WalletDialog } from "@/components/wallet-dialog";
@@ -47,6 +48,12 @@ export function Dashboard() {
     () => sortHoldings(holdings, prices, sort),
     [holdings, prices, sort],
   );
+
+  useEffect(() => {
+    if (!holdings.length || !portfolio.plans.length) return;
+    if (Object.keys(prices).length < 1) return;
+    portfolio.ensureBaselines(prices);
+  }, [holdings, prices, portfolio.plans, portfolio.ensureBaselines]);
 
   const chooseSort = (next: HoldingSort) => {
     setSort(next);
@@ -232,6 +239,8 @@ export function Dashboard() {
             </Button>
           </div>
         </div>
+
+        <DcaNotices holdings={holdings} plans={portfolio.plans} prices={prices} />
 
         {holdings.length === 0 ? (
           <EmptyState

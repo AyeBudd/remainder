@@ -21,6 +21,11 @@ export type DcaPlan = {
   targetDate: string;
   frequency: DcaFrequency;
   assumedPrice: number | null;
+  baselineAt?: string | null;
+  baselineDays?: number | null;
+  baselineUsdPerBuy?: number | null;
+  baselinePrice?: number | null;
+  baselineRemaining?: number | null;
 };
 
 export type DcaPlanInput = Omit<DcaPlan, "id">;
