@@ -55,7 +55,7 @@ export function usePrices() {
       }
     }
     void load();
-    const timer = window.setInterval(() => void load(), 60_000);
+    const timer = window.setInterval(() => void load(), 5 * 60_000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

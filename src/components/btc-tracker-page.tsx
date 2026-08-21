@@ -49,7 +49,7 @@ export function BtcTrackerPage() {
 
   useEffect(() => {
     void load(false);
-    const poll = window.setInterval(() => void load(false), 60_000);
+    const poll = window.setInterval(() => void load(false), 5 * 60_000);
     const tick = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => {
       window.clearInterval(poll);
