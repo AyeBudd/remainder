@@ -63,8 +63,8 @@ export function NewsletterPage() {
       )}
 
       <p className="mt-12 text-[11px] leading-relaxed text-muted-foreground">
-        Not financial advice. Items are summaries of public reports. Friday issues run at 9:00 a.m. Eastern when
-        the host has an xAI key. Opt in under Account settings to get the brief by email.
+        Not financial advice. Items are summaries of public reports. The brief is due Friday 9:00 a.m. Eastern;
+        if the scheduled job misses, opening this page publishes it. Opt in under Account settings for email.
       </p>
     </section>
   );

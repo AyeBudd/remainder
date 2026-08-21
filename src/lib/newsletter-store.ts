@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getSql } from "@/lib/db";
 import { mailerReady, sendMail, wrapEmail } from "@/lib/mail";
 import type { NewsletterIssue, NewsletterItem } from "@/lib/newsletter";
-import { generateNewsletter, seedIssue } from "@/lib/newsletter-write";
+import { generateNewsletter, seedIssue, thisWeekSlug, weeklyIssueDue } from "@/lib/newsletter-write";
 
 function asIssue(row: {
   slug: string;
@@ -77,10 +77,12 @@ export async function ensureSeedIssue(): Promise<NewsletterIssue[]> {
 }
 
 export async function publishWeeklyIssue(): Promise<{ slug: string; emailed: number; skipped?: string }> {
-  const issue = await generateNewsletter({ tester: false });
+  const slug = thisWeekSlug();
+  if (!weeklyIssueDue()) return { slug, emailed: 0, skipped: "not-due" };
   const sql = await getSql();
-  const existing = await sql<{ slug: string }>`select slug from newsletters where slug = ${issue.slug} limit 1`;
-  if (existing[0]) return { slug: issue.slug, emailed: 0, skipped: "exists" };
+  const existing = await sql<{ slug: string }>`select slug from newsletters where slug = ${slug} limit 1`;
+  if (existing[0]) return { slug, emailed: 0, skipped: "exists" };
+  const issue = await generateNewsletter({ tester: false, slug });
   await insertIssue(issue);
   const emailed = await emailSubscribers(issue);
   return { slug: issue.slug, emailed };
@@ -118,6 +120,11 @@ async function emailSubscribers(issue: NewsletterIssue): Promise<number> {
 
 export const listNewsletters = createServerFn({ method: "GET" }).handler(async () => {
   try {
+    try {
+      await publishWeeklyIssue();
+    } catch {
+      /* cron/page both retry; still show whatever is stored */
+    }
     return await ensureSeedIssue();
   } catch {
     return [seedIssue()];

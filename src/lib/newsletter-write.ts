@@ -77,16 +77,25 @@ function top50Line(): string {
 
 function fridaySlug(now = new Date()): string {
   const day = now.getUTCDay();
-  const offset = day === 0 ? -2 : day < 5 ? 5 - day : 0;
+  const offset = day === 0 ? -2 : day === 6 ? -1 : day < 5 ? 5 - day : 0;
   const friday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + offset));
   return friday.toISOString().slice(0, 10);
+}
+
+export function thisWeekSlug(now = new Date()): string {
+  return fridaySlug(now);
+}
+
+export function weeklyIssueDue(now = new Date()): boolean {
+  const slug = fridaySlug(now);
+  return now.getTime() >= Date.parse(`${slug}T13:00:00.000Z`);
 }
 
 export function seedIssue(): NewsletterIssue {
   return SEED_ISSUE;
 }
 
-function coerceIssue(raw: unknown, slug: string, tester: boolean): NewsletterIssue | null {
+function coerceIssue(raw: unknown, slug: string, tester: boolean, allowEmpty = false): NewsletterIssue | null {
   if (!raw || typeof raw !== "object") return null;
   const o = raw as Record<string, unknown>;
   const itemsIn = Array.isArray(o.items) ? o.items : [];
@@ -113,12 +122,34 @@ function coerceIssue(raw: unknown, slug: string, tester: boolean): NewsletterIss
       sourceUrl: typeof r.sourceUrl === "string" && r.sourceUrl.startsWith("http") ? r.sourceUrl : undefined,
     });
   }
-  if (items.length === 0) return null;
+  if (items.length === 0 && !allowEmpty) return null;
   return {
     slug,
     title: String(o.title ?? `Remaindr brief — ${slug}`).slice(0, 120),
     lede: String(o.lede ?? "").slice(0, 500),
     items: items.slice(0, 12),
+    tester,
+    publishedAt: new Date().toISOString(),
+  };
+}
+
+function fallbackIssue(slug: string, tester: boolean, headlines: Headline[]): NewsletterIssue {
+  const items: NewsletterItem[] = headlines.slice(0, 8).map((h) => ({
+    category: "macro" as const,
+    headline: h.title.slice(0, 160),
+    body: (h.summary || h.title).slice(0, 800),
+    assets: [],
+    source: h.source,
+    sourceUrl: h.link.startsWith("http") ? h.link : undefined,
+  }));
+  return {
+    slug,
+    title: `Remaindr brief — ${slug}`,
+    lede:
+      items.length > 0
+        ? "Facts pulled from public wires this week. No forecasts."
+        : "No material items cleared the bar this week. This brief records that absence rather than filling space.",
+    items,
     tester,
     publishedAt: new Date().toISOString(),
   };
@@ -130,21 +161,18 @@ export async function generateNewsletter(opts?: {
 }): Promise<NewsletterIssue> {
   const tester = Boolean(opts?.tester);
   const slug = opts?.slug ?? (tester ? "2026-08-20-tester" : fridaySlug());
-  const apiKey = process.env.XAI_API_KEY?.trim();
-  if (!apiKey) {
-    if (tester) return seedIssue();
-    throw new Error("XAI_API_KEY missing");
-  }
-
   const headlines = await gatherHeadlines();
-  const briefing =
-    headlines.length > 0
-      ? headlines
-          .map((h, i) => `${i + 1}. ${h.title}\n   ${h.date} · ${h.source}\n   ${h.summary}\n   ${h.link}`)
-          .join("\n\n")
-      : "(No RSS items returned. Use only widely reported facts you can ground, or return fewer items.)";
+  const apiKey = process.env.XAI_API_KEY?.trim();
+  if (apiKey) {
+    try {
+      const briefing =
+        headlines.length > 0
+          ? headlines
+              .map((h, i) => `${i + 1}. ${h.title}\n   ${h.date} · ${h.source}\n   ${h.summary}\n   ${h.link}`)
+              .join("\n\n")
+          : "(No RSS items returned. Use only widely reported facts you can ground, or return fewer items.)";
 
-  const system = `You write Remaindr Brief, a factual crypto digest.
+      const system = `You write Remaindr Brief, a factual crypto digest.
 Rules:
 - Report only events that already happened or documents that were published.
 - No predictions, price targets, “could”, “expected to rally”, “bullish”, “bearish”, “moon”, or investment advice.
@@ -155,7 +183,7 @@ Top 50: ${top50Line()}
 - Past tense or present facts. Include dates and figures when known.
 - Return JSON only.`;
 
-  const user = `Write this week's Remaindr Brief as JSON:
+      const user = `Write this week's Remaindr Brief as JSON:
 {
   "title": "Remaindr brief — ${slug}",
   "lede": "2-3 sentences, facts only",
@@ -174,35 +202,35 @@ Use 3 to 8 items. Omit coins with no material news.
 Source material:
 ${briefing}`;
 
-  const res = await fetch("https://api.x.ai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "grok-4.5",
-      temperature: 0.2,
-      max_tokens: 3500,
-      response_format: { type: "json_object" },
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
-  if (!res.ok) {
-    throw new Error(`xAI ${res.status}`);
+      const res = await fetch("https://api.x.ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        signal: AbortSignal.timeout(25_000),
+        body: JSON.stringify({
+          model: "grok-4.5",
+          temperature: 0.2,
+          max_tokens: 3500,
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+          ],
+        }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+        const text = body.choices?.[0]?.message?.content ?? "";
+        const parsed = JSON.parse(text) as unknown;
+        const issue = coerceIssue(parsed, slug, tester);
+        if (issue) return issue;
+      }
+    } catch {
+      /* RSS fallback */
+    }
   }
-  const body = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const text = body.choices?.[0]?.message?.content ?? "";
-  let parsed: unknown = null;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("Newsletter JSON parse failed");
-  }
-  const issue = coerceIssue(parsed, slug, tester);
-  if (!issue) throw new Error("Newsletter empty");
-  return issue;
+  if (tester) return seedIssue();
+  return fallbackIssue(slug, tester, headlines);
 }
