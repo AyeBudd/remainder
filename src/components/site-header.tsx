@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Eye, EyeOff } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
+import { startTour } from "@/lib/tour";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import type { AppView } from "@/lib/view";
 import { AppNav } from "@/components/app-nav";
@@ -63,6 +64,7 @@ function AuthSlot() {
         <DropdownMenuItem asChild>
           <Link to="/account">Account settings</Link>
         </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => startTour()}>Walkthrough</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => void signOut("/")}>Sign out</DropdownMenuItem>
       </DropdownMenuContent>
