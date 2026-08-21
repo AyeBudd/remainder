@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ASSETS, setActiveCatalog, type Asset } from "@/lib/assets";
 import { getMarket } from "@/lib/catalog";
+import { initPresence, isRefreshPaused, subscribePresence } from "@/lib/presence";
 import type { PricePayload } from "@/lib/prices";
 
 export function usePrices() {
@@ -45,7 +46,9 @@ export function usePrices() {
 
   useEffect(() => {
     let cancelled = false;
+    let wasPaused = isRefreshPaused();
     async function load() {
+      if (isRefreshPaused()) return;
       try {
         const next = await getMarket({ data: { force: false } });
         if (cancelled) return;
@@ -54,11 +57,18 @@ export function usePrices() {
         if (!cancelled) setStatus("error");
       }
     }
+    initPresence();
     void load();
     const timer = window.setInterval(() => void load(), 5 * 60_000);
+    const unsub = subscribePresence(() => {
+      const paused = isRefreshPaused();
+      if (wasPaused && !paused) void load();
+      wasPaused = paused;
+    });
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      unsub();
     };
   }, [apply]);
 

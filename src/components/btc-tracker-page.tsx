@@ -18,6 +18,7 @@ import {
   formatUsdCompact,
 } from "@/lib/format";
 import { usePrices } from "@/hooks/use-prices";
+import { initPresence, isRefreshPaused, subscribePresence } from "@/lib/presence";
 import { Change24 } from "@/components/change-24";
 import { PriceChart } from "@/components/price-chart";
 import { Button } from "@/components/ui/button";
@@ -48,12 +49,23 @@ export function BtcTrackerPage() {
   );
 
   useEffect(() => {
+    let wasPaused = isRefreshPaused();
+    initPresence();
     void load(false);
-    const poll = window.setInterval(() => void load(false), 5 * 60_000);
+    const poll = window.setInterval(() => {
+      if (isRefreshPaused()) return;
+      void load(false);
+    }, 5 * 60_000);
     const tick = window.setInterval(() => setNow(Date.now()), 15_000);
+    const unsub = subscribePresence(() => {
+      const paused = isRefreshPaused();
+      if (wasPaused && !paused) void load(false);
+      wasPaused = paused;
+    });
     return () => {
       window.clearInterval(poll);
       window.clearInterval(tick);
+      unsub();
     };
   }, [load]);
 
