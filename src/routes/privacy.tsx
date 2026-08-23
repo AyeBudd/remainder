@@ -120,7 +120,9 @@ function PrivacyPage() {
 
       <h2>Contact</h2>
       <p>
-        Privacy questions: use the email on your Remaindr account. Related terms are in{" "}
+        Privacy questions:{" "}
+        <a href="mailto:hello@remaindr.xyz">hello@remaindr.xyz</a> or the{" "}
+        <Link to="/contact">contact page</Link>. Related terms are in{" "}
         <Link to="/terms">Terms of use</Link>.
       </p>
     </LegalDoc>

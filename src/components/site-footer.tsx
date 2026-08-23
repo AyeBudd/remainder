@@ -13,6 +13,9 @@ export function SiteFooter() {
         <Link to="/privacy" className="underline-offset-4 hover:text-foreground hover:underline">
           Privacy
         </Link>
+        <Link to="/contact" className="underline-offset-4 hover:text-foreground hover:underline">
+          Contact
+        </Link>
       </nav>
     </footer>
   );

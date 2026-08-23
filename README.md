@@ -57,6 +57,7 @@ GitHub Pages is guest-only. Accounts need the full app on Vercel plus a Postgres
 | `VITE_AUTH_ENABLED` | `true` |
 | `RESEND_API_KEY` | Resend API key so newsletter confirms and DCA warnings can send |
 | `EMAIL_FROM` | e.g. `Remaindr <alerts@remaindr.xyz>` (must be a verified Resend domain) |
+| `CONTACT_INBOX` | Where /contact form mail is delivered (your private inbox). Public address is always hello@remaindr.xyz |
 | `CRON_SECRET` | Random string; Vercel Cron sends it as `Authorization: Bearer …` |
 | `XAI_API_KEY` | xAI key so Friday’s newsletter can be written from current headlines |
 

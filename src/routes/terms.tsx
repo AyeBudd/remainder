@@ -112,8 +112,9 @@ function TermsPage() {
 
       <h2>Contact</h2>
       <p>
-        Questions about these terms: use the email on your Remaindr account, or the contact path
-        posted on remaindr.xyz. Privacy details are in the{" "}
+        Questions about these terms:{" "}
+        <a href="mailto:hello@remaindr.xyz">hello@remaindr.xyz</a> or the{" "}
+        <Link to="/contact">contact page</Link>. Privacy details are in the{" "}
         <Link to="/privacy">Privacy policy</Link>.
       </p>
     </LegalDoc>
