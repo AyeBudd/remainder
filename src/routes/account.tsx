@@ -8,6 +8,7 @@ import { downloadLedgerCsv } from "@/lib/export-ledger";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,6 +49,7 @@ function AccountPage() {
       <div className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 sm:px-6">
         <SiteHeader />
         <div className="mt-10 h-40 animate-pulse rounded-xl bg-card" />
+        <SiteFooter />
       </div>
     );
   }
@@ -308,7 +310,11 @@ function AccountPage() {
           <h2 className="font-serif text-2xl tracking-tight text-destructive">Delete account</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Permanently removes this account, holdings, wallets, DCA plans, and settings. This cannot be undone.
-            Export first if you want a copy.
+            Export first if you want a copy. See the{" "}
+            <Link to="/privacy" className="text-foreground underline-offset-4 hover:underline">
+              Privacy policy
+            </Link>
+            .
           </p>
           <form className="mt-5 space-y-3" onSubmit={(e) => void destroy(e)}>
             <div className="space-y-1.5">
@@ -332,6 +338,7 @@ function AccountPage() {
           </form>
         </section>
       </main>
+      <SiteFooter />
     </div>
   );
 }

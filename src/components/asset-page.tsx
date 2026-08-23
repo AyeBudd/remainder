@@ -21,6 +21,7 @@ import { PriceChart } from "@/components/price-chart";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { writeAppView, type AppView } from "@/lib/view";
 
 type Props = { coinId: string };
@@ -192,6 +193,7 @@ export function AssetPage({ coinId }: Props) {
           )}
         </>
       ) : null}
+      <SiteFooter />
     </div>
   );
 }

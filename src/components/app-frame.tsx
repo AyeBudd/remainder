@@ -3,6 +3,7 @@ import { BtcTrackerPage } from "@/components/btc-tracker-page";
 import { Dashboard } from "@/components/dashboard";
 import { NewsletterPage } from "@/components/newsletter-page";
 import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import { WhatIfPage } from "@/components/what-if-page";
 import { readAppView, writeAppView, type AppView } from "@/lib/view";
 
@@ -35,6 +36,7 @@ export function AppFrame() {
       ) : (
         <Dashboard />
       )}
+      <SiteFooter />
     </div>
   );
 }

@@ -151,7 +151,19 @@ function Login() {
             </Button>
           </form>
 
-          <p className="mt-4 text-sm text-muted-foreground">
+      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+        By creating an account or signing in you agree to the{" "}
+        <Link to="/terms" className="text-foreground underline-offset-4 hover:underline">
+          Terms
+        </Link>{" "}
+        and{" "}
+        <Link to="/privacy" className="text-foreground underline-offset-4 hover:underline">
+          Privacy policy
+        </Link>
+        .
+      </p>
+
+      <p className="mt-4 text-sm text-muted-foreground">
             {mode === "up" ? "Already have an account?" : "Need an account?"}{" "}
             <button
               type="button"
@@ -172,6 +184,14 @@ function Login() {
       <Link to="/" className="mt-8 text-sm text-muted-foreground underline-offset-4 hover:underline">
         Back to the ledger
       </Link>
+      <nav className="mt-6 flex gap-4 text-xs text-muted-foreground">
+        <Link to="/terms" className="underline-offset-4 hover:text-foreground hover:underline">
+          Terms
+        </Link>
+        <Link to="/privacy" className="underline-offset-4 hover:text-foreground hover:underline">
+          Privacy
+        </Link>
+      </nav>
     </main>
   );
 }
