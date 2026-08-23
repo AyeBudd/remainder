@@ -6,6 +6,7 @@ import {
   type Asset,
 } from "./assets";
 import { BAKED_TOP_100 } from "@/lib/baked-assets";
+import { cacheIsFresh, readMarketCache, writeMarketCache } from "@/lib/market-cache";
 
 export const MARKET_TOP = 250;
 
@@ -17,8 +18,9 @@ export type MarketPayload = {
   source: "coingecko" | "coinlore" | "paprika" | "baked";
 };
 
-const CACHE_MS = 45_000;
+const MEMORY_MS = 3_000;
 let cache: MarketPayload | null = null;
+let inflight: Promise<MarketPayload> | null = null;
 
 const COINLORE_NAMEID: Record<string, string> = Object.fromEntries(
   BAKED_TOP_100.map((a) => [a.coingeckoId, a.coingeckoId]),
@@ -211,27 +213,50 @@ async function fromPaprika(force = false): Promise<MarketPayload> {
 }
 
 export async function loadMarket(opts?: { force?: boolean }): Promise<MarketPayload> {
-  if (!opts?.force && cache && Date.now() - cache.updatedAt < CACHE_MS) return cache;
-  for (const source of [fromCoinGecko, fromCoinlore, fromPaprika]) {
-    try {
-      const next = await source(Boolean(opts?.force));
-      if (next.assets.length >= 50) {
-        cache = next;
-        return next;
-      }
-    } catch {
-      /* next venue */
+  const force = Boolean(opts?.force);
+  if (!force && cache && Date.now() - cache.updatedAt < MEMORY_MS) return cache;
+  if (!force) {
+    const shared = await readMarketCache();
+    if (shared && cacheIsFresh(shared)) {
+      cache = shared;
+      return shared;
     }
+    if (shared) cache = shared;
   }
-  return (
-    cache ?? {
+  if (inflight) return inflight;
+  inflight = (async () => {
+    for (const source of [fromCoinGecko, fromCoinlore, fromPaprika]) {
+      try {
+        const next = await source(force);
+        if (next.assets.length >= 50) {
+          cache = next;
+          await writeMarketCache(next);
+          return next;
+        }
+      } catch {
+        /* next venue */
+      }
+    }
+    const stale = cache ?? (await readMarketCache());
+    if (stale) {
+      cache = stale;
+      return stale;
+    }
+    const baked: MarketPayload = {
       assets: catalogFromBaked(),
       prices: {},
       changes: {},
       updatedAt: Date.now(),
       source: "baked",
-    }
-  );
+    };
+    cache = baked;
+    return baked;
+  })();
+  try {
+    return await inflight;
+  } finally {
+    inflight = null;
+  }
 }
 
 export const getMarket = createServerFn({ method: "GET" })

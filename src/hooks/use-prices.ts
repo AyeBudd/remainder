@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ASSETS, setActiveCatalog, type Asset } from "@/lib/assets";
 import { getMarket } from "@/lib/catalog";
+import { MARKET_BUCKET_MS, msUntilNextMarketBucket } from "@/lib/market-cache";
 import { initPresence, isRefreshPaused, subscribePresence } from "@/lib/presence";
 import type { PricePayload } from "@/lib/prices";
 
@@ -59,7 +60,11 @@ export function usePrices() {
     }
     initPresence();
     void load();
-    const timer = window.setInterval(() => void load(), 5 * 60_000);
+    let interval = 0;
+    const aligned = window.setTimeout(() => {
+      void load();
+      interval = window.setInterval(() => void load(), MARKET_BUCKET_MS);
+    }, msUntilNextMarketBucket());
     const unsub = subscribePresence(() => {
       const paused = isRefreshPaused();
       if (wasPaused && !paused) void load();
@@ -67,7 +72,8 @@ export function usePrices() {
     });
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      window.clearTimeout(aligned);
+      window.clearInterval(interval);
       unsub();
     };
   }, [apply]);

@@ -249,7 +249,7 @@ export function Dashboard() {
             {priceStatus === "loading" && !updatedAt
               ? "Fetching live prices…"
               : updatedAt
-                ? `Prices updated ${formatUpdated(updatedAt, now)} · auto every 5 min`
+                ? `Prices updated ${formatUpdated(updatedAt, now)} · shared snapshot every 5 min`
                 : "Prices pending"}
           </p>
           <Button
