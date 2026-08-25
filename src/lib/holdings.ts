@@ -94,12 +94,17 @@ function parseBaseline(raw: unknown): Partial<DcaPlan> {
   const o = raw as Record<string, unknown>;
   const days = num(o.baselineDays as string | number);
   const usd = num(o.baselineUsdPerBuy as string | number);
+  const targetAmt = num(o.baselineTargetAmount as string | number);
+  const currentAmt = num(o.baselineCurrentAmount as string | number);
   return {
     baselineAt: typeof o.baselineAt === "string" ? o.baselineAt : null,
     baselineDays: days > 0 ? days : null,
     baselineUsdPerBuy: usd > 0 ? usd : null,
     baselinePrice: o.baselinePrice == null ? null : num(o.baselinePrice as string | number),
     baselineRemaining: o.baselineRemaining == null ? null : num(o.baselineRemaining as string | number),
+    baselineTargetAmount: targetAmt > 0 ? targetAmt : null,
+    baselineCurrentAmount: currentAmt >= 0 && o.baselineCurrentAmount != null ? currentAmt : null,
+    baselineTargetDate: typeof o.baselineTargetDate === "string" ? o.baselineTargetDate : null,
   };
 }
 
@@ -109,6 +114,9 @@ function baselineJson(data: {
   baselineUsdPerBuy?: number | null;
   baselinePrice?: number | null;
   baselineRemaining?: number | null;
+  baselineTargetAmount?: number | null;
+  baselineCurrentAmount?: number | null;
+  baselineTargetDate?: string | null;
 }): string | null {
   if (!(data.baselineDays && data.baselineDays > 0 && data.baselineUsdPerBuy && data.baselineUsdPerBuy > 0)) {
     return null;
@@ -119,6 +127,9 @@ function baselineJson(data: {
     baselineUsdPerBuy: data.baselineUsdPerBuy,
     baselinePrice: data.baselinePrice ?? null,
     baselineRemaining: data.baselineRemaining ?? null,
+    baselineTargetAmount: data.baselineTargetAmount ?? null,
+    baselineCurrentAmount: data.baselineCurrentAmount ?? null,
+    baselineTargetDate: data.baselineTargetDate ?? null,
   });
 }
 
@@ -158,6 +169,9 @@ const planInput = z.object({
   baselineUsdPerBuy: z.number().positive().nullable().optional(),
   baselinePrice: z.number().positive().nullable().optional(),
   baselineRemaining: z.number().min(0).nullable().optional(),
+  baselineTargetAmount: z.number().positive().nullable().optional(),
+  baselineCurrentAmount: z.number().min(0).nullable().optional(),
+  baselineTargetDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
 });
 
 export const listHoldings = createServerFn({ method: "GET" })

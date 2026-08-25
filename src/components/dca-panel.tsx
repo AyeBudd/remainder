@@ -4,7 +4,7 @@ import { DcaChart } from "@/components/dca-chart";
 import { formatCoins, formatSignedPercent, formatSignedUsd, formatUsd, parseAmount } from "@/lib/format";
 import { veil } from "@/lib/privacy";
 import { planToDatePnl, unrealizedPnl } from "@/lib/pnl";
-import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "@/lib/types";
+import type { DcaFrequency, DcaPlan, DcaPlanInput, Holding, PriceMap } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,12 +23,7 @@ type Props = {
   hideAmounts?: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
-  onSave: (input: {
-    holdingId: string;
-    targetDate: string;
-    frequency: DcaFrequency;
-    assumedPrice: number | null;
-  }) => Promise<void>;
+  onSave: (input: DcaPlanInput) => Promise<void>;
   onClear: (planId: string) => Promise<void>;
 };
 
@@ -97,6 +92,9 @@ export function DcaPanel({ holdings, plans, prices, hideAmounts, selectedId, onS
               baselineUsdPerBuy: existing.baselineUsdPerBuy,
               baselinePrice: existing.baselinePrice,
               baselineRemaining: existing.baselineRemaining,
+              baselineTargetAmount: existing.baselineTargetAmount,
+              baselineCurrentAmount: existing.baselineCurrentAmount,
+              baselineTargetDate: existing.baselineTargetDate,
             }
           : captureBaseline(holding, { targetDate, frequency, assumedPrice }, prices)),
       });

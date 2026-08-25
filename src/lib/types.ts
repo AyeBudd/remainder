@@ -37,6 +37,9 @@ export type DcaPlan = {
   baselineUsdPerBuy?: number | null;
   baselinePrice?: number | null;
   baselineRemaining?: number | null;
+  baselineTargetAmount?: number | null;
+  baselineCurrentAmount?: number | null;
+  baselineTargetDate?: string | null;
 };
 
 export type DcaPlanInput = Omit<DcaPlan, "id">;

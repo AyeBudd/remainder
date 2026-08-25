@@ -1,4 +1,4 @@
-import { assessDcaPace } from "@/lib/dca";
+import { assessDcaPace, DCA_ETA_WARN } from "@/lib/dca";
 import { loadMarket } from "@/lib/catalog";
 import { getSql } from "@/lib/db";
 import { sendMail, wrapEmail, mailerReady } from "@/lib/mail";
@@ -25,12 +25,17 @@ function parseBaseline(raw: unknown): Partial<DcaPlan> {
   const o = raw as Record<string, unknown>;
   const days = num(o.baselineDays as string | number);
   const usd = num(o.baselineUsdPerBuy as string | number);
+  const targetAmt = num(o.baselineTargetAmount as string | number);
+  const currentAmt = num(o.baselineCurrentAmount as string | number);
   return {
     baselineAt: typeof o.baselineAt === "string" ? o.baselineAt : null,
     baselineDays: days > 0 ? days : null,
     baselineUsdPerBuy: usd > 0 ? usd : null,
     baselinePrice: o.baselinePrice == null ? null : num(o.baselinePrice as string | number),
     baselineRemaining: o.baselineRemaining == null ? null : num(o.baselineRemaining as string | number),
+    baselineTargetAmount: targetAmt > 0 ? targetAmt : null,
+    baselineCurrentAmount: currentAmt >= 0 && o.baselineCurrentAmount != null ? currentAmt : null,
+    baselineTargetDate: typeof o.baselineTargetDate === "string" ? o.baselineTargetDate : null,
   };
 }
 
@@ -134,11 +139,11 @@ export async function runDcaAlerts(): Promise<{ checked: number; mailed: number;
       subject: "Remaindr — a DCA plan is off target",
       html: wrapEmail(
         "Re-check a DCA plan",
-        `<p>Hey ${user.name || "there"} — at least one saved plan moved more than 25% from the original ETA.</p>
+        `<p>Hey ${user.name || "there"} — at least one saved plan moved more than ${Math.round(DCA_ETA_WARN * 100)}% from the original ETA.</p>
          <ul>${lines}</ul>
-         <p>Recommend re-evaluating DCA due to price change. Open Remaindr to update the plan.</p>`,
+         <p>Open Remaindr to pick a path back: raise the buy, move the date, or trim the target. Planning math only — not financial advice.</p>`,
       ),
-      text: `A Remaindr DCA plan is off target (25% ETA change). Symbols: ${off.map((r) => r.symbol).join(", ")}.`,
+      text: `A Remaindr DCA plan is off target (${Math.round(DCA_ETA_WARN * 100)}% ETA change). Symbols: ${off.map((r) => r.symbol).join(", ")}.`,
     });
     if (result.sent) {
       mailed += 1;

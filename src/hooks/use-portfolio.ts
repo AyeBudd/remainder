@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { format } from "date-fns";
 import {
@@ -148,6 +148,10 @@ export function usePortfolio() {
   const [error, setError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
   const signedIn = Boolean(user);
+  const holdingsRef = useRef<Holding[]>(holdings);
+  const plansRef = useRef<DcaPlan[]>(plans);
+  holdingsRef.current = holdings;
+  plansRef.current = plans;
 
   const reload = useCallback(async () => {
     setError(null);
@@ -177,10 +181,23 @@ export function usePortfolio() {
 
   useEffect(() => {
     if (isPending) return;
+    if (!user) return;
     void reload().finally(() => setBooted(true));
-  }, [isPending, reload]);
+  }, [isPending, reload, user]);
+
+  useLayoutEffect(() => {
+    if (isPending) return;
+    if (user) return;
+    const local = readLocal();
+    setHoldings(local.holdings);
+    setPlans(local.plans);
+    setWallets(readLocalWallets());
+    setBooted(true);
+  }, [isPending, user]);
 
   const persistGuest = (nextHoldings: Holding[], nextPlans: DcaPlan[]) => {
+    holdingsRef.current = nextHoldings;
+    plansRef.current = nextPlans;
     writeLocal({ holdings: nextHoldings, plans: nextPlans });
   };
 
@@ -201,7 +218,7 @@ export function usePortfolio() {
     };
     setHoldings((prev) => {
       const next = [...(prev ?? []), created];
-      persistGuest(next, plans);
+      persistGuest(next, plansRef.current);
       return next;
     });
     return created;
@@ -238,7 +255,7 @@ export function usePortfolio() {
         updated = { ...h, ...patch, walletAmount, manualAmount, currentAmount, source, costBasisUsd };
         return updated;
       });
-      persistGuest(next, plans);
+      persistGuest(next, plansRef.current);
       return next;
     });
     return updated;
@@ -270,7 +287,7 @@ export function usePortfolio() {
     const saved: DcaPlan = { ...input, id: existing?.id ?? crypto.randomUUID() };
     setPlans((prev) => {
       const next = [...prev.filter((p) => p.holdingId !== input.holdingId), saved];
-      persistGuest(holdings ?? [], next);
+      persistGuest(holdingsRef.current, next);
       return next;
     });
     return saved;
@@ -278,21 +295,41 @@ export function usePortfolio() {
 
   const ensureBaselines = useCallback(
     (prices: PriceMap) => {
+      const pending: DcaPlan[] = [];
       setPlans((prev) => {
         let changed = false;
         const next = prev.map((plan) => {
-          if (hasBaseline(plan)) return plan;
           const holding = holdings.find((h) => h.id === plan.holdingId);
           if (!holding) return plan;
+          const targetDrift =
+            plan.baselineTargetAmount != null &&
+            Math.abs(plan.baselineTargetAmount - holding.targetAmount) >
+              Math.max(1e-8, Math.abs(holding.targetAmount) * 0.001);
+          if (hasBaseline(plan) && !targetDrift) return plan;
           const snap = captureBaseline(holding, plan, prices);
           if (!snap.baselineUsdPerBuy) return plan;
           changed = true;
-          return { ...plan, ...snap };
+          const updated = { ...plan, ...snap };
+          pending.push(updated);
+          return updated;
         });
         if (!changed) return prev;
-        if (!user) persistGuest(holdings ?? [], next);
+        if (!user) persistGuest(holdingsRef.current, next);
         return next;
       });
+      if (user && pending.length > 0) {
+        void (async () => {
+          for (const plan of pending) {
+            const { id: _id, ...input } = plan;
+            try {
+              const saved = await upsertDcaPlan({ data: input });
+              setPlans((cur) => cur.map((p) => (p.holdingId === saved.holdingId ? saved : p)));
+            } catch {
+              /* keep the in-memory snapshot */
+            }
+          }
+        })();
+      }
     },
     [holdings, user],
   );
@@ -320,7 +357,7 @@ export function usePortfolio() {
     }
     setPlans((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      if (!user) persistGuest(holdings ?? [], next);
+      if (!user) persistGuest(holdingsRef.current, next);
       return next;
     });
   };
@@ -376,5 +413,6 @@ export function usePortfolio() {
     removePlan,
     loadSample,
     reload,
+    booted,
   };
 }

@@ -1,9 +1,7 @@
 import {
   addDays,
   addMonths,
-  addWeeks,
   differenceInCalendarDays,
-  differenceInCalendarMonths,
   format,
   isAfter,
   parseISO,
@@ -11,6 +9,11 @@ import {
 } from "date-fns";
 import type { DcaFrequency, DcaPlan, Holding, PriceMap } from "./types";
 import { remainingCoins } from "./assets";
+import { countPeriods, frequencyNoun, PERIOD_DAYS, stepDate } from "./dca-periods";
+import { SLIP_THRESHOLD } from "./dca-pace";
+
+export { countPeriods, frequencyNoun, stepDate } from "./dca-periods";
+export const DCA_ETA_WARN = SLIP_THRESHOLD;
 
 export type DcaPoint = {
   t: number;
@@ -48,17 +51,6 @@ export type DcaQuote = {
   series: DcaPoint[];
   milestones: DcaMilestone[];
 };
-
-const FREQ_LABEL: Record<DcaFrequency, string> = {
-  daily: "day",
-  weekly: "week",
-  biweekly: "two weeks",
-  monthly: "month",
-};
-
-export function frequencyNoun(freq: DcaFrequency): string {
-  return FREQ_LABEL[freq];
-}
 
 function fullDateLabel(d: Date): string {
   return format(d, "MMM d, yyyy");
@@ -132,36 +124,6 @@ export function chartDots(series: DcaPoint[]): DcaPoint[] {
   const step = Math.ceil((series.length - 1) / 12);
   for (let i = 0; i < series.length; i += step) keep.add(i);
   return series.filter((_, i) => keep.has(i));
-}
-
-export function countPeriods(from: Date, to: Date, freq: DcaFrequency): number {
-  const start = startOfDay(from);
-  const end = startOfDay(to);
-  if (!isAfter(end, start)) return 0;
-  const days = differenceInCalendarDays(end, start);
-  switch (freq) {
-    case "daily":
-      return Math.max(1, days);
-    case "weekly":
-      return Math.max(1, Math.ceil(days / 7));
-    case "biweekly":
-      return Math.max(1, Math.ceil(days / 14));
-    case "monthly":
-      return Math.max(1, differenceInCalendarMonths(end, start) || 1);
-  }
-}
-
-function stepDate(from: Date, freq: DcaFrequency, n: number): Date {
-  switch (freq) {
-    case "daily":
-      return addDays(from, n);
-    case "weekly":
-      return addWeeks(from, n);
-    case "biweekly":
-      return addWeeks(from, n * 2);
-    case "monthly":
-      return addMonths(from, n);
-  }
 }
 
 function parsePlanDate(value: string): Date | null {
@@ -274,21 +236,15 @@ export function defaultTargetDate(monthsAhead = 6): string {
   return format(addMonths(new Date(), monthsAhead), "yyyy-MM-dd");
 }
 
-const PERIOD_DAYS: Record<DcaFrequency, number> = {
-  daily: 1,
-  weekly: 7,
-  biweekly: 14,
-  monthly: 365 / 12,
-};
-
-export const DCA_ETA_WARN = 0.25;
-
 export type DcaBaseline = {
   baselineAt: string;
   baselineDays: number;
   baselineUsdPerBuy: number | null;
   baselinePrice: number | null;
   baselineRemaining: number;
+  baselineTargetAmount: number;
+  baselineCurrentAmount: number;
+  baselineTargetDate: string;
 };
 
 export function captureBaseline(
@@ -305,6 +261,9 @@ export function captureBaseline(
     baselineUsdPerBuy: quote.usdPerBuy,
     baselinePrice: quote.priceUsed,
     baselineRemaining: quote.remainingCoins,
+    baselineTargetAmount: holding.targetAmount,
+    baselineCurrentAmount: holding.currentAmount,
+    baselineTargetDate: plan.targetDate,
   };
 }
 
@@ -349,7 +308,7 @@ export function assessDcaPace(
   const impliedDays = (remainUsd / plan.baselineUsdPerBuy) * PERIOD_DAYS[plan.frequency];
   const change = (impliedDays - plan.baselineDays) / plan.baselineDays;
   return {
-    status: Math.abs(change) >= DCA_ETA_WARN ? "off-track" : "on-track",
+    status: change >= DCA_ETA_WARN ? "off-track" : "on-track",
     change,
     impliedDays,
   };

@@ -68,16 +68,18 @@ export function Dashboard() {
   }, [holdings, prices, sort, query]);
 
   useEffect(() => {
+    if (!portfolio.booted) return;
     if (!holdings.length || !portfolio.plans.length) return;
     if (Object.keys(prices).length < 1) return;
     portfolio.ensureBaselines(prices);
-  }, [holdings, prices, portfolio.plans, portfolio.ensureBaselines]);
+  }, [holdings, prices, portfolio.plans, portfolio.ensureBaselines, portfolio.booted]);
 
   useEffect(() => {
+    if (!portfolio.booted) return;
     if (!holdings.length) return;
     if (Object.keys(prices).length < 1) return;
     portfolio.ensureCostBasis(prices);
-  }, [holdings, prices, portfolio.ensureCostBasis]);
+  }, [holdings, prices, portfolio.ensureCostBasis, portfolio.booted]);
 
   const chooseSort = (next: HoldingSort) => {
     setSort(next);
@@ -341,7 +343,16 @@ export function Dashboard() {
           </div>
         )}
 
-        <DcaNotices holdings={holdings} plans={portfolio.plans} prices={prices} />
+        <DcaNotices
+          holdings={holdings}
+          plans={portfolio.plans}
+          prices={prices}
+          hideAmounts={hideAmounts}
+          onApply={async ({ holdingId, patch, plan }) => {
+            if (patch) await portfolio.update(holdingId, patch);
+            await portfolio.savePlan(plan);
+          }}
+        />
 
         {holdings.length === 0 ? (
           <EmptyState

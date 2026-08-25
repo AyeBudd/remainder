@@ -13,7 +13,7 @@ export const TOUR_STEPS = [
   },
   {
     title: "The path",
-    body: "Scroll to DCA at the bottom. Cadence + a date → dollars per buy and a chart to 100%. We’ll warn you if the ETA slips more than 25%.",
+    body: "Scroll to DCA at the bottom. Cadence + a date → dollars per buy and a chart to 100%. If the ETA slips more than 25%, you’ll get a card with three ways back: raise the buy, move the date, or trim the target.",
   },
   {
     title: "Other pages",
