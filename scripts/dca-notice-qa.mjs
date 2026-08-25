@@ -25,7 +25,76 @@ function slipPlans(raw) {
   return JSON.stringify(parsed);
 }
 
+function sampleTargetDate() {
+  const now = new Date();
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 6, 19));
+  return d.toISOString().slice(0, 10);
+}
+
+function sampleLedger() {
+  const targetDate = sampleTargetDate();
+  return JSON.stringify({
+    holdings: [
+      {
+        id: "sample-btc",
+        symbol: "BTC",
+        name: "Bitcoin",
+        coingeckoId: "bitcoin",
+        targetAmount: 1,
+        currentAmount: 0.37,
+        source: "manual",
+        walletAddress: null,
+        walletAmount: 0,
+        manualAmount: 0.37,
+        costBasisUsd: null,
+      },
+      {
+        id: "sample-eth",
+        symbol: "ETH",
+        name: "Ethereum",
+        coingeckoId: "ethereum",
+        targetAmount: 16,
+        currentAmount: 8.4,
+        source: "manual",
+        walletAddress: null,
+        walletAmount: 0,
+        manualAmount: 8.4,
+        costBasisUsd: null,
+      },
+      {
+        id: "sample-sol",
+        symbol: "SOL",
+        name: "Solana",
+        coingeckoId: "solana",
+        targetAmount: 250,
+        currentAmount: 64,
+        source: "manual",
+        walletAddress: null,
+        walletAmount: 0,
+        manualAmount: 64,
+        costBasisUsd: null,
+      },
+    ],
+    plans: [
+      {
+        id: "sample-dca-btc",
+        holdingId: "sample-btc",
+        targetDate,
+        frequency: "weekly",
+        assumedPrice: null,
+      },
+    ],
+  });
+}
+
 try {
+  await context.addInitScript(
+    ([ledger, onboard]) => {
+      localStorage.setItem("remainder.v1", ledger);
+      localStorage.setItem("remainder.onboarding.v1", onboard);
+    },
+    [sampleLedger(), JSON.stringify({ completed: true, draft: null })],
+  );
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.waitForSelector("text=Remaindr", { timeout: 20000 });
   await page.waitForSelector("text=Holdings", { timeout: 20000 });

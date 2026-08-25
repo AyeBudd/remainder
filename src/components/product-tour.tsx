@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
   closeTour,
+  dismissTourOffer,
   nextTourStep,
   offerTour,
   prevTourStep,
@@ -9,6 +10,7 @@ import {
   startTour,
   TOUR_STEPS,
 } from "@/lib/tour";
+import { subscribeOnboardingUi } from "@/hooks/use-onboarding";
 import { useTour } from "@/hooks/use-tour";
 import { Button } from "@/components/ui/button";
 
@@ -16,15 +18,23 @@ export function ProductTour() {
   const { user, isPending } = useCurrentUserState();
   const { mode, step } = useTour();
   const offeredFor = useRef<string | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  useEffect(() => subscribeOnboardingUi(setOnboardingOpen), []);
+
+  useEffect(() => {
+    if (onboardingOpen) dismissTourOffer();
+  }, [onboardingOpen]);
 
   useEffect(() => {
     if (isPending || !user?.id) return;
+    if (onboardingOpen) return;
     if (readTourSeen(user.id)) return;
     if (offeredFor.current === user.id) return;
     offeredFor.current = user.id;
     const id = window.setTimeout(() => offerTour(), 600);
     return () => window.clearTimeout(id);
-  }, [isPending, user?.id]);
+  }, [isPending, user?.id, onboardingOpen]);
 
   useEffect(() => {
     if (mode === "closed") return;

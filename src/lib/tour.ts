@@ -79,6 +79,12 @@ export function closeTour(userId?: string | null) {
   emit();
 }
 
+export function dismissTourOffer() {
+  if (state.mode === "closed") return;
+  state = { mode: "closed", step: 0 };
+  emit();
+}
+
 export function nextTourStep() {
   if (state.mode !== "tour") return;
   if (state.step >= TOUR_STEPS.length - 1) return;

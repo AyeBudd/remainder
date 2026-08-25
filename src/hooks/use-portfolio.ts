@@ -88,9 +88,9 @@ function readLocal(): LocalState {
   if (typeof window === "undefined") return { holdings: [], plans: [] };
   try {
     const raw = window.localStorage.getItem(LOCAL_KEY);
-    if (raw === null) return makeSample();
+    if (raw === null) return { holdings: [], plans: [] };
     const parsed = JSON.parse(raw) as LocalState;
-    if (!Array.isArray(parsed.holdings) || !Array.isArray(parsed.plans)) return makeSample();
+    if (!Array.isArray(parsed.holdings) || !Array.isArray(parsed.plans)) return { holdings: [], plans: [] };
     return {
       holdings: parsed.holdings.map((h) => ({
         ...h,
@@ -101,7 +101,7 @@ function readLocal(): LocalState {
       plans: parsed.plans,
     };
   } catch {
-    return makeSample();
+    return { holdings: [], plans: [] };
   }
 }
 
@@ -142,8 +142,8 @@ function writeLocalWallets(wallets: LinkedWallet[]) {
 
 export function usePortfolio() {
   const { user, isPending } = useCurrentUserState();
-  const [holdings, setHoldings] = useState<Holding[]>(() => makeSample().holdings);
-  const [plans, setPlans] = useState<DcaPlan[]>(() => makeSample().plans);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [plans, setPlans] = useState<DcaPlan[]>([]);
   const [wallets, setWallets] = useState<LinkedWallet[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
@@ -393,6 +393,7 @@ export function usePortfolio() {
     setHoldings(sample.holdings);
     setPlans(sample.plans);
     if (!user) persistGuest(sample.holdings, sample.plans);
+    return sample;
   };
 
   return {

@@ -16,7 +16,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/dca-pace.test.ts",
+    "test": "node --test 'scripts/**/*.test.mjs' && node --experimental-strip-types --test src/lib/dca-pace.test.ts src/lib/progress.test.ts src/lib/onboarding.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

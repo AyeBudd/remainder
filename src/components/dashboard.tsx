@@ -3,7 +3,9 @@ import { Link } from "@tanstack/react-router";
 import { ArrowUpDown, Check, Download, Plus, RefreshCw, Search, Upload, Wallet } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
 import { downloadLedgerCsv } from "@/lib/export-ledger";
-import { formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
+import { formatCoins, formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
+import { prettyDate } from "@/lib/dca-pace";
+import { detectNewMilestones, planVersionFrom, progressMoment, seedSampleHistory, summarizeProgress } from "@/lib/progress";
 import { unrealizedPnl } from "@/lib/pnl";
 import {
   HOLDING_SORTS,
@@ -12,9 +14,11 @@ import {
   writeHoldingSort,
   type HoldingSort,
 } from "@/lib/sort-holdings";
-import type { Holding, HoldingInput } from "@/lib/types";
+import type { DcaPlan, DcaPlanInput, Holding, HoldingInput } from "@/lib/types";
+import { useOnboarding, emitOnboardingUi, readJustOnboarded, writeJustOnboarded, type JustOnboarded } from "@/hooks/use-onboarding";
 import { usePortfolio } from "@/hooks/use-portfolio";
 import { usePrices } from "@/hooks/use-prices";
+import { useProgress } from "@/hooks/use-progress";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import { veil } from "@/lib/privacy";
 import { AddBuyDialog } from "@/components/add-buy-dialog";
@@ -23,6 +27,7 @@ import { ImportCsvDialog } from "@/components/import-csv-dialog";
 import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
+import { Onboarding } from "@/components/onboarding";
 import { WalletDialog } from "@/components/wallet-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +42,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function Dashboard() {
   const portfolio = usePortfolio();
+  const progress = useProgress();
   const { prices, changes, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
   const { hidden: hideAmounts } = useHideAmounts();
   const [addOpen, setAddOpen] = useState(false);
@@ -48,13 +54,16 @@ export function Dashboard() {
   const [now, setNow] = useState(() => Date.now());
   const [sort, setSort] = useState<HoldingSort>(() => readHoldingSort());
   const [query, setQuery] = useState("");
+  const [just, setJust] = useState<JustOnboarded | null>(null);
+
+  const holdings = portfolio.holdings;
+  const onboarding = useOnboarding({ booted: portfolio.booted, holdingsCount: holdings.length });
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 15_000);
     return () => window.clearInterval(id);
   }, []);
 
-  const holdings = portfolio.holdings;
   const visibleHoldings = useMemo(() => {
     const sorted = sortHoldings(holdings, prices, sort);
     const q = query.trim().toLowerCase();
@@ -81,9 +90,44 @@ export function Dashboard() {
     portfolio.ensureCostBasis(prices);
   }, [holdings, prices, portfolio.ensureCostBasis, portfolio.booted]);
 
+  useEffect(() => {
+    emitOnboardingUi(onboarding.show);
+    return () => emitOnboardingUi(false);
+  }, [onboarding.show]);
+
+  useEffect(() => {
+    if (onboarding.show) return;
+    const row = readJustOnboarded();
+    if (row) setJust(row);
+  }, [onboarding.show]);
+
+  useEffect(() => {
+    if (!portfolio.booted) return;
+    if (!holdings.length) return;
+    if (Object.keys(prices).length < 1) return;
+    void progress.ensureToday(holdings, portfolio.plans, prices);
+  }, [holdings, portfolio.booted, portfolio.plans, prices, progress.ensureToday]);
+
+  useEffect(() => {
+    if (!portfolio.booted || holdings.length === 0) return;
+    const id = sessionStorage.getItem("remaindr.openDca");
+    if (!id) return;
+    sessionStorage.removeItem("remaindr.openDca");
+    setDcaId(id);
+    window.requestAnimationFrame(() => {
+      document.getElementById("dca")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [holdings.length, portfolio.booted]);
+
   const chooseSort = (next: HoldingSort) => {
     setSort(next);
     writeHoldingSort(next);
+  };
+
+  const snapshot = async (holding: Holding | undefined, plan?: DcaPlan | null) => {
+    if (!holding) return;
+    const nextPlan = plan ?? portfolio.plans.find((p) => p.holdingId === holding.id) ?? null;
+    await progress.recordHolding(holding, nextPlan, prices);
   };
 
   const totals = useMemo(() => {
@@ -119,8 +163,8 @@ export function Dashboard() {
   const saveHolding = async (input: HoldingInput, id?: string) => {
     const markPrice = prices[input.coingeckoId];
     const payload = markPrice != null ? { ...input, markPrice } : input;
-    if (id) await portfolio.update(id, payload);
-    else await portfolio.add(payload);
+    const saved = id ? await portfolio.update(id, payload) : await portfolio.add(payload);
+    await snapshot(saved);
   };
 
   const applyWallet = async (
@@ -129,16 +173,52 @@ export function Dashboard() {
     for (const u of updates) {
       const holding = holdings.find((h) => h.id === u.id);
       const markPrice = holding ? prices[holding.coingeckoId] : undefined;
-      await portfolio.update(u.id, {
+      const updated = await portfolio.update(u.id, {
         walletAmount: u.walletAmount,
         walletAddress: u.walletAddress,
         source: u.walletAmount > 0 ? "wallet" : "manual",
         markPrice,
       });
+      await snapshot(updated);
     }
   };
 
-  if (portfolio.isLoading) {
+  const createFromOnboarding = async (input: HoldingInput, plan: DcaPlanInput | null) => {
+    const created = await portfolio.add(input);
+    const savedPlan = plan ? await portfolio.savePlan({ ...plan, holdingId: created.id }) : null;
+    await progress.recordHolding(created, savedPlan, prices);
+    onboarding.complete();
+  };
+
+  const loadSampleStack = () => {
+    const sample = portfolio.loadSample();
+    const snapshots = sample.holdings.flatMap((h) => seedSampleHistory(h));
+    const versions = sample.holdings.map((h) => {
+      const plan = sample.plans.find((p) => p.holdingId === h.id) ?? null;
+      return planVersionFrom(h, plan, null);
+    });
+    const milestones = sample.holdings.flatMap((h) => {
+      const snaps = snapshots.filter((s) => s.holdingId === h.id);
+      const last = snaps[snaps.length - 1];
+      if (!last) return [];
+      return detectNewMilestones(h.id, 0, last.completionPct, [], last.takenAt);
+    });
+    progress.seed({ snapshots, milestones, versions });
+    onboarding.complete();
+  };
+
+  const momentLine = useMemo(() => {
+    for (const h of holdings) {
+      const bundle = progress.forHolding(h.id);
+      if (bundle.snapshots.length < 2) continue;
+      const plan = portfolio.plans.find((p) => p.holdingId === h.id) ?? null;
+      const line = progressMoment(summarizeProgress(bundle.snapshots, plan), h.symbol);
+      if (line) return line;
+    }
+    return null;
+  }, [holdings, portfolio.plans, progress.bundle, progress.forHolding]);
+
+  if (portfolio.isLoading || (!onboarding.ready && holdings.length === 0)) {
     return (
       <div className="mt-10 space-y-4">
         <p className="text-sm text-muted-foreground">Loading your ledger…</p>
@@ -152,6 +232,21 @@ export function Dashboard() {
     );
   }
 
+  if (onboarding.show) {
+    return (
+      <Onboarding
+        assets={assets}
+        prices={prices}
+        holdings={holdings}
+        draft={onboarding.draft}
+        onDraft={onboarding.setDraft}
+        onSkip={onboarding.skip}
+        onSample={portfolio.signedIn ? undefined : loadSampleStack}
+        onCreate={createFromOnboarding}
+      />
+    );
+  }
+
   return (
     <>
       {!portfolio.signedIn && (
@@ -162,6 +257,17 @@ export function Dashboard() {
           </Link>{" "}
           to save it to your account.
         </p>
+      )}
+
+      {just && (
+        <JustSetBanner
+          just={just}
+          hideAmounts={hideAmounts}
+          onDismiss={() => {
+            writeJustOnboarded(null);
+            setJust(null);
+          }}
+        />
       )}
 
       <section className="mt-8 sm:mt-12">
@@ -210,6 +316,7 @@ export function Dashboard() {
           />
           <MiniStat label="Assets" value={String(holdings.length)} />
         </div>
+        {momentLine && <p className="mt-4 text-sm text-muted-foreground">{momentLine}</p>}
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           P/L uses the cost basis you type on Edit amounts. If you leave it blank, new coins are marked at the live
           price when you save or refresh a wallet. CEX fills are not imported.
@@ -349,8 +456,11 @@ export function Dashboard() {
           prices={prices}
           hideAmounts={hideAmounts}
           onApply={async ({ holdingId, patch, plan }) => {
-            if (patch) await portfolio.update(holdingId, patch);
-            await portfolio.savePlan(plan);
+            const holding = patch
+              ? await portfolio.update(holdingId, patch)
+              : holdings.find((h) => h.id === holdingId);
+            const saved = await portfolio.savePlan(plan);
+            await snapshot(holding, saved);
           }}
         />
 
@@ -359,13 +469,8 @@ export function Dashboard() {
             signedIn={portfolio.signedIn}
             onAdd={() => setAddOpen(true)}
             onImport={() => setImportOpen(true)}
-            onSample={
-              portfolio.signedIn
-                ? undefined
-                : () => {
-                    portfolio.loadSample();
-                  }
-            }
+            onGuide={onboarding.restart}
+            onSample={portfolio.signedIn ? undefined : loadSampleStack}
           />
         ) : visibleHoldings.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
@@ -387,7 +492,10 @@ export function Dashboard() {
                   setDcaId(holding.id);
                   document.getElementById("dca")?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }}
-                onDelete={() => void portfolio.remove(holding.id)}
+                onDelete={() => {
+                  void portfolio.remove(holding.id);
+                  progress.dropHolding(holding.id);
+                }}
               />
             ))}
           </div>
@@ -402,7 +510,12 @@ export function Dashboard() {
           hideAmounts={hideAmounts}
           selectedId={dcaId}
           onSelect={setDcaId}
-          onSave={(input) => portfolio.savePlan(input).then(() => undefined)}
+          onSave={(input) =>
+            portfolio.savePlan(input).then(async (saved) => {
+              const holding = holdings.find((h) => h.id === saved.holdingId);
+              await snapshot(holding, saved);
+            })
+          }
           onClear={(id) => portfolio.removePlan(id)}
         />
       </div>
@@ -434,7 +547,8 @@ export function Dashboard() {
         }}
         onSave={async (patch) => {
           if (!buying) return;
-          await portfolio.update(buying.id, patch);
+          const updated = await portfolio.update(buying.id, patch);
+          await snapshot(updated);
         }}
       />
       <ImportCsvDialog
@@ -443,9 +557,22 @@ export function Dashboard() {
         assets={assets}
         prices={prices}
         onOpenChange={setImportOpen}
-        onAdd={portfolio.add}
-        onUpdate={portfolio.update}
-        onPlan={portfolio.savePlan}
+        onAdd={async (input) => {
+          const created = await portfolio.add(input);
+          await snapshot(created);
+          return created;
+        }}
+        onUpdate={async (id, patch) => {
+          const updated = await portfolio.update(id, patch);
+          await snapshot(updated);
+          return updated;
+        }}
+        onPlan={async (input) => {
+          const saved = await portfolio.savePlan(input);
+          const holding = holdings.find((h) => h.id === saved.holdingId);
+          await snapshot(holding, saved);
+          return saved;
+        }}
       />
       <WalletDialog
         open={walletOpen}
@@ -455,9 +582,10 @@ export function Dashboard() {
         onAddWallet={(address) => portfolio.addWallet(address).then(() => undefined)}
         onRemoveWallet={(address) => portfolio.removeWallet(address).then(() => undefined)}
         onApply={applyWallet}
-        onAddFromWallet={(input) =>
-          portfolio.add({ ...input, markPrice: prices[input.coingeckoId] }).then(() => undefined)
-        }
+        onAddFromWallet={async (input) => {
+          const created = await portfolio.add({ ...input, markPrice: prices[input.coingeckoId] });
+          await snapshot(created);
+        }}
       />
     </>
   );
@@ -490,11 +618,13 @@ function EmptyState({
   onAdd,
   onImport,
   onSample,
+  onGuide,
 }: {
   signedIn: boolean;
   onAdd: () => void;
   onImport: () => void;
   onSample?: () => void;
+  onGuide?: () => void;
 }) {
   return (
     <div className="mt-4 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
@@ -512,6 +642,11 @@ function EmptyState({
           <Upload />
           Import CSV
         </Button>
+        {onGuide && (
+          <Button variant="outline" onClick={onGuide}>
+            Guided setup
+          </Button>
+        )}
         {onSample && (
           <Button variant="outline" onClick={onSample}>
             Use sample stack
@@ -522,5 +657,47 @@ function EmptyState({
         <p className="mt-4 text-xs text-muted-foreground">Saved to your account.</p>
       )}
     </div>
+  );
+}
+
+function JustSetBanner({
+  just,
+  hideAmounts,
+  onDismiss,
+}: {
+  just: JustOnboarded;
+  hideAmounts: boolean;
+  onDismiss: () => void;
+}) {
+  const ratio = just.target > 0 ? just.current / just.target : 0;
+  return (
+    <section className="mt-6 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs tracking-[0.18em] text-muted-foreground uppercase">You’re set</p>
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="min-h-11 text-sm text-muted-foreground hover:text-foreground"
+        >
+          Dismiss
+        </button>
+      </div>
+      <h2 className="mt-1 font-serif text-3xl tracking-tight">{just.symbol} target</h2>
+      <p className="mt-3 font-mono text-sm tabular-nums">
+        {hideAmounts
+          ? `${formatPercent(ratio)} of target`
+          : `${formatCoins(just.current, just.symbol)} / ${formatCoins(just.target, just.symbol)} ${just.symbol}`}
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {formatPercent(ratio)} complete
+        {hideAmounts
+          ? ""
+          : ` · ${formatCoins(just.remaining, just.symbol)} ${just.symbol} remaining`}
+        {just.targetDate ? ` · ${prettyDate(just.targetDate)}` : " · no deadline"}
+        {just.usdPerBuy != null && !hideAmounts
+          ? ` · about ${formatUsd(just.usdPerBuy, { precise: just.usdPerBuy < 100 })}/week`
+          : ""}
+      </p>
+    </section>
   );
 }

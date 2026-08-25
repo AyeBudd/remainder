@@ -16,8 +16,10 @@ import { unrealizedPnl } from "@/lib/pnl";
 import { veil } from "@/lib/privacy";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
 import { usePortfolio } from "@/hooks/use-portfolio";
+import { useProgress } from "@/hooks/use-progress";
 import { Change24 } from "@/components/change-24";
 import { PriceChart } from "@/components/price-chart";
+import { ProgressPanel } from "@/components/progress-panel";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteHeader } from "@/components/site-header";
@@ -29,6 +31,8 @@ type Props = { coinId: string };
 export function AssetPage({ coinId }: Props) {
   const navigate = useNavigate();
   const portfolio = usePortfolio();
+  const progress = useProgress();
+  const { hidden: hideAmounts } = useHideAmounts();
   const [days, setDays] = useState<(typeof CHART_RANGES)[number]["id"]>("90");
   const [data, setData] = useState<AssetMarket | null>(null);
   const [error, setError] = useState(false);
@@ -54,6 +58,8 @@ export function AssetPage({ coinId }: Props) {
   }, [coinId, days]);
 
   const holding = portfolio.holdings.find((h) => h.coingeckoId === coinId);
+  const plan = holding ? (portfolio.plans.find((p) => p.holdingId === holding.id) ?? null) : null;
+  const bundle = holding ? progress.forHolding(holding.id) : null;
   const first = data?.series[0]?.price;
   const last = data?.series[data.series.length - 1]?.price;
   const chartUp = first != null && last != null ? last >= first : (data?.change24 ?? 0) >= 0;
@@ -104,6 +110,22 @@ export function AssetPage({ coinId }: Props) {
           </section>
 
           {holding && <HoldingStrip holding={holding} price={data.price} />}
+
+          {holding && bundle && (
+            <ProgressPanel
+              symbol={holding.symbol}
+              snapshots={bundle.snapshots}
+              milestones={bundle.milestones}
+              versions={bundle.versions}
+              plan={plan}
+              hideAmounts={hideAmounts}
+              onAdjustPlan={() => {
+                sessionStorage.setItem("remaindr.openDca", holding.id);
+                writeAppView("ledger");
+                void navigate({ to: "/" });
+              }}
+            />
+          )}
 
           <section className="mt-8 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">

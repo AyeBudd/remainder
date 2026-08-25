@@ -118,6 +118,9 @@ export const deleteAccount = createServerFn({ method: "POST" })
     const users = await sql<{ email: string | null }>`
       select email from "user" where id = ${id}
     `;
+    await sql`delete from holding_plan_versions where user_id = ${id}`;
+    await sql`delete from holding_milestones where user_id = ${id}`;
+    await sql`delete from holding_snapshots where user_id = ${id}`;
     await sql`delete from dca_plans where user_id = ${id}`;
     await sql`delete from holdings where user_id = ${id}`;
     await sql`delete from user_wallets where user_id = ${id}`;
