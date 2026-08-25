@@ -142,58 +142,69 @@ function writeLocalWallets(wallets: LinkedWallet[]) {
 
 export function usePortfolio() {
   const { user, isPending } = useCurrentUserState();
+  const userId = user?.id ?? null;
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [plans, setPlans] = useState<DcaPlan[]>([]);
   const [wallets, setWallets] = useState<LinkedWallet[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [booted, setBooted] = useState(false);
-  const signedIn = Boolean(user);
+  const signedIn = Boolean(userId);
   const holdingsRef = useRef<Holding[]>(holdings);
   const plansRef = useRef<DcaPlan[]>(plans);
+  const reloadGen = useRef(0);
+  const modeRef = useRef<"none" | "user" | "guest">("none");
   holdingsRef.current = holdings;
   plansRef.current = plans;
 
   const reload = useCallback(async () => {
+    const gen = ++reloadGen.current;
     setError(null);
-    if (user) {
+    if (userId) {
       try {
         const [nextHoldings, nextPlans, nextWallets] = await Promise.all([
           listHoldings(),
           listDcaPlans(),
           listUserWallets(),
         ]);
+        if (gen !== reloadGen.current) return;
         setHoldings(nextHoldings);
         setPlans(nextPlans);
         setWallets(nextWallets);
       } catch (err) {
+        if (gen !== reloadGen.current) return;
         setError(err instanceof Error ? err.message : "Could not load holdings");
-        setHoldings([]);
-        setPlans([]);
-        setWallets([]);
       }
       return;
     }
     const local = readLocal();
+    if (gen !== reloadGen.current) return;
     setHoldings(local.holdings);
     setPlans(local.plans);
     setWallets(readLocalWallets());
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     if (isPending) return;
-    if (!user) return;
+    if (!userId) return;
+    modeRef.current = "user";
     void reload().finally(() => setBooted(true));
-  }, [isPending, reload, user]);
+  }, [isPending, reload, userId]);
 
   useLayoutEffect(() => {
     if (isPending) return;
-    if (user) return;
+    if (userId) {
+      modeRef.current = "user";
+      return;
+    }
+    // A signed-in ledger must not be wiped by a brief session blip.
+    if (modeRef.current === "user") return;
+    modeRef.current = "guest";
     const local = readLocal();
     setHoldings(local.holdings);
     setPlans(local.plans);
     setWallets(readLocalWallets());
     setBooted(true);
-  }, [isPending, user]);
+  }, [isPending, userId]);
 
   const persistGuest = (nextHoldings: Holding[], nextPlans: DcaPlan[]) => {
     holdingsRef.current = nextHoldings;
@@ -314,10 +325,10 @@ export function usePortfolio() {
           return updated;
         });
         if (!changed) return prev;
-        if (!user) persistGuest(holdingsRef.current, next);
+        if (!userId) persistGuest(holdingsRef.current, next);
         return next;
       });
-      if (user && pending.length > 0) {
+      if (userId && pending.length > 0) {
         void (async () => {
           for (const plan of pending) {
             const { id: _id, ...input } = plan;
@@ -331,7 +342,7 @@ export function usePortfolio() {
         })();
       }
     },
-    [holdings, user],
+    [holdings, userId],
   );
 
   const ensureCostBasis = useCallback(
@@ -348,7 +359,7 @@ export function usePortfolio() {
         }
       })();
     },
-    [holdings, user],
+    [holdings, userId],
   );
 
   const removePlan = async (id: string) => {
@@ -401,7 +412,7 @@ export function usePortfolio() {
     plans,
     wallets,
     error,
-    isLoading: Boolean(user) && !booted,
+    isLoading: Boolean(userId) && !booted,
     signedIn,
     add,
     update,

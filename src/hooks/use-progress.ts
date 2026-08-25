@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import {
   addLocalMilestones,
@@ -31,23 +31,27 @@ function empty(): ProgressBundle {
 
 export function useProgress() {
   const { user } = useCurrentUserState();
+  const userId = user?.id ?? null;
   const [bundle, setBundle] = useState<ProgressBundle>(empty);
   const [loaded, setLoaded] = useState(false);
+  const bundleRef = useRef(bundle);
+  const ensuring = useRef(false);
+  bundleRef.current = bundle;
 
   const reload = useCallback(async () => {
-    if (user) {
+    if (userId) {
       try {
         const next = await listAllProgress();
         setBundle(next);
       } catch {
-        setBundle(empty());
+        /* keep whatever we already have */
       }
       setLoaded(true);
       return;
     }
     setBundle(readLocalProgress());
     setLoaded(true);
-  }, [user]);
+  }, [userId]);
 
   useEffect(() => {
     void reload();
@@ -55,11 +59,12 @@ export function useProgress() {
 
   const recordHolding = useCallback(
     async (holding: Holding, plan: DcaPlan | null, prices: PriceMap, now = new Date()) => {
+      const current = bundleRef.current;
       const snap = buildSnapshot(holding, plan, prices, now);
-      const prior = bundle.snapshots
+      const prior = current.snapshots
         .filter((s) => s.holdingId === holding.id && s.takenAt < snap.takenAt)
         .sort((a, b) => b.takenAt.localeCompare(a.takenAt))[0];
-      const existingMiles = bundle.milestones.filter((m) => m.holdingId === holding.id);
+      const existingMiles = current.milestones.filter((m) => m.holdingId === holding.id);
       const fresh = detectNewMilestones(
         holding.id,
         prior?.completionPct ?? 0,
@@ -68,10 +73,10 @@ export function useProgress() {
         snap.takenAt,
       );
       const nextVer = planVersionFrom(holding, plan, snap.usdPerBuy, now);
-      const lastVer = [...bundle.versions.filter((v) => v.holdingId === holding.id)].pop();
+      const lastVer = [...current.versions.filter((v) => v.holdingId === holding.id)].pop();
       const verNeeded = versionChanged(lastVer, nextVer);
 
-      if (user) {
+      if (userId) {
         try {
           const saved = await saveSnapshot({ data: snap });
           setBundle((prev) => {
@@ -120,26 +125,34 @@ export function useProgress() {
       setBundle(readLocalProgress());
       return snap;
     },
-    [bundle.milestones, bundle.snapshots, bundle.versions, user],
+    [userId],
   );
 
   const ensureToday = useCallback(
     async (holdings: Holding[], plans: DcaPlan[], prices: PriceMap) => {
+      if (ensuring.current) return;
       if (Object.keys(prices).length < 1) return;
-      const today = new Date().toISOString().slice(0, 10);
-      for (const holding of holdings) {
-        const already = bundle.snapshots.some((s) => s.holdingId === holding.id && s.takenAt === today);
-        if (already) continue;
-        const plan = plans.find((p) => p.holdingId === holding.id) ?? null;
-        await recordHolding(holding, plan, prices);
+      ensuring.current = true;
+      try {
+        const today = new Date().toISOString().slice(0, 10);
+        for (const holding of holdings) {
+          const already = bundleRef.current.snapshots.some(
+            (s) => s.holdingId === holding.id && s.takenAt === today,
+          );
+          if (already) continue;
+          const plan = plans.find((p) => p.holdingId === holding.id) ?? null;
+          await recordHolding(holding, plan, prices);
+        }
+      } finally {
+        ensuring.current = false;
       }
     },
-    [bundle.snapshots, recordHolding],
+    [recordHolding],
   );
 
   const seed = useCallback(
     (partial: Partial<ProgressBundle>) => {
-      if (user) return;
+      if (userId) return;
       const current = readLocalProgress();
       seedLocalProgress({
         snapshots: [...current.snapshots, ...(partial.snapshots ?? [])],
@@ -148,19 +161,19 @@ export function useProgress() {
       });
       setBundle(readLocalProgress());
     },
-    [user],
+    [userId],
   );
 
   const dropHolding = useCallback(
     (holdingId: string) => {
-      if (!user) dropLocalHolding(holdingId);
+      if (!userId) dropLocalHolding(holdingId);
       setBundle((prev) => ({
         snapshots: prev.snapshots.filter((s) => s.holdingId !== holdingId),
         milestones: prev.milestones.filter((m) => m.holdingId !== holdingId),
         versions: prev.versions.filter((v) => v.holdingId !== holdingId),
       }));
     },
-    [user],
+    [userId],
   );
 
   const forHolding = useCallback(

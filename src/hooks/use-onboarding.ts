@@ -55,6 +55,7 @@ export function subscribeOnboardingUi(fn: (show: boolean) => void): () => void {
 
 export function useOnboarding(opts: { booted: boolean; holdingsCount: number }) {
   const { user } = useCurrentUserState();
+  const userId = user?.id ?? null;
   const [completed, setCompleted] = useState(false);
   const [ready, setReady] = useState(false);
   const [forced, setForced] = useState(false);
@@ -65,7 +66,7 @@ export function useOnboarding(opts: { booted: boolean; holdingsCount: number }) 
     if (local.draft && typeof local.draft === "object") {
       setDraftState({ ...emptyDraft(), ...(local.draft as Partial<OnboardingDraft>) });
     }
-    if (!user) {
+    if (!userId) {
       setCompleted(Boolean(local.completed));
       setReady(true);
       return;
@@ -84,7 +85,7 @@ export function useOnboarding(opts: { booted: boolean; holdingsCount: number }) 
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [userId]);
 
   const persistDraft = useCallback(
     (next: OnboardingDraft) => {
@@ -100,16 +101,16 @@ export function useOnboarding(opts: { booted: boolean; holdingsCount: number }) 
       setCompleted(done);
       const local = readOnboardingLocal();
       writeOnboardingLocal({ ...local, completed: done, draft: done ? null : local.draft });
-      if (user) {
+      if (userId) {
         try {
           await setOnboarding({ data: { completed: done } });
         } catch {
           /* guest-style local flag still set */
         }
-        if (done && opts?.seenTour) writeTourSeen(user.id);
+        if (done && opts?.seenTour) writeTourSeen(userId);
       }
     },
-    [user],
+    [userId],
   );
 
   useEffect(() => {
@@ -147,7 +148,7 @@ export function useOnboarding(opts: { booted: boolean; holdingsCount: number }) 
       writeOnboardingLocal({ completed: false, draft: emptyDraft() });
       setCompleted(false);
       setForced(true);
-      if (user) {
+      if (userId) {
         void setOnboarding({ data: { completed: false } }).catch(() => undefined);
       }
     },
