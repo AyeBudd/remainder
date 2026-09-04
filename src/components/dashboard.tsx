@@ -275,7 +275,7 @@ export function Dashboard() {
           {hideAmounts ? "Filled toward targets" : "Remaining to hit targets"}
         </p>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
-          <h1 className="font-serif text-6xl leading-none tracking-tight tabular-nums sm:text-7xl">
+          <h1 className="font-serif text-6xl leading-none tracking-tight text-destructive tabular-nums sm:text-7xl">
             {hideAmounts
               ? formatPercent(totals.fill)
               : totals.priced > 0

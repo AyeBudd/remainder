@@ -134,8 +134,8 @@ export function DcaPanel({ holdings, plans, prices, hideAmounts, selectedId, onS
         )}
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <div className="space-y-1.5">
+      <div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2">
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="dca-date">Hit target by</Label>
           <Input
             id="dca-date"
@@ -145,7 +145,7 @@ export function DcaPanel({ holdings, plans, prices, hideAmounts, selectedId, onS
             suppressHydrationWarning
           />
         </div>
-        <div className="space-y-1.5">
+        <div className="min-w-0 space-y-1.5">
           <Label htmlFor="dca-price">Assumed price (optional)</Label>
           <Input
             id="dca-price"

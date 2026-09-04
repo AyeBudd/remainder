@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { signOut } from "@/lib/auth/client";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { startTour } from "@/lib/tour";
 import { useHideAmounts } from "@/hooks/use-hide-amounts";
+import { useSpaceBg } from "@/hooks/use-space-bg";
 import type { AppView } from "@/lib/view";
 import { AppNav } from "@/components/app-nav";
 import { Button } from "@/components/ui/button";
@@ -92,10 +93,28 @@ export function SiteHeader({ view = "ledger", onViewChange }: Props) {
         </Link>
       </div>
       <div className="flex items-center gap-1">
+        <SpaceBgButton />
         <HideAmountsButton />
         <AuthSlot />
       </div>
     </header>
+  );
+}
+
+function SpaceBgButton() {
+  const { on, toggle } = useSpaceBg();
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      onClick={toggle}
+      aria-pressed={on}
+      aria-label={on ? "Turn off space background" : "Turn on space background"}
+      title={on ? "Space off" : "Space on"}
+    >
+      <Sparkles className={on ? "text-primary" : "text-muted-foreground"} />
+    </Button>
   );
 }
 
