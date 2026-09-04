@@ -2,26 +2,26 @@
 @import "tw-animate-css";
 
 @theme {
-  --color-background: #0c0d0c;
-  --color-foreground: #f0efe8;
-  --color-card: #141514;
-  --color-card-foreground: #f0efe8;
-  --color-popover: #181918;
-  --color-popover-foreground: #f0efe8;
-  --color-primary: #d8dad4;
-  --color-primary-foreground: #0c0d0c;
-  --color-secondary: #1c1d1c;
-  --color-secondary-foreground: #f0efe8;
-  --color-muted: #1a1b1a;
-  --color-muted-foreground: #8e8d86;
-  --color-accent: #222322;
-  --color-accent-foreground: #f0efe8;
-  --color-destructive: #c45c4a;
-  --color-destructive-foreground: #f0efe8;
-  --color-border: rgb(240 239 232 / 0.1);
-  --color-input: rgb(240 239 232 / 0.12);
-  --color-ring: #d8dad4;
-  --color-success: #7d9a78;
+  --color-background: #05060a;
+  --color-foreground: #eef2f6;
+  --color-card: #0c1016;
+  --color-card-foreground: #eef2f6;
+  --color-popover: #121826;
+  --color-popover-foreground: #eef2f6;
+  --color-primary: #2ee6c5;
+  --color-primary-foreground: #05060a;
+  --color-secondary: #12181f;
+  --color-secondary-foreground: #eef2f6;
+  --color-muted: #10161c;
+  --color-muted-foreground: #c5ccd4;
+  --color-accent: #152018;
+  --color-accent-foreground: #eef2f6;
+  --color-destructive: #ff7a59;
+  --color-destructive-foreground: #eef2f6;
+  --color-border: rgb(46 230 197 / 0.16);
+  --color-input: rgb(238 242 246 / 0.12);
+  --color-ring: #2ee6c5;
+  --color-success: #7cffb2;
   --font-sans: "Source Sans 3", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Instrument Serif", "Times New Roman", serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -30,8 +30,8 @@
   --radius-lg: 0.875rem;
   --radius-xl: 1.25rem;
   --radius: 0.75rem;
-  --shadow-border: 0 0 0 1px rgb(240 239 232 / 0.08);
-  --shadow-border-hover: 0 0 0 1px rgb(240 239 232 / 0.14);
+  --shadow-border: 0 0 0 1px rgb(46 230 197 / 0.12);
+  --shadow-border-hover: 0 0 0 1px rgb(46 230 197 / 0.22);
 }
 
 @layer base {
@@ -52,6 +52,7 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     line-height: 1.5;
+    overflow-x: hidden;
   }
 
   button:not(:disabled),
@@ -69,10 +70,119 @@
     text-wrap: pretty;
   }
 
+  input[type="date"] {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  input[type="date"]::-webkit-datetime-edit {
+    min-width: 0;
+    overflow: hidden;
+  }
+
   input[type="date"]::-webkit-calendar-picker-indicator {
     cursor: pointer;
     filter: invert(1);
     opacity: 1;
+    flex-shrink: 0;
+  }
+
+  h1.tabular-nums {
+    color: var(--color-destructive);
+  }
+
+  ::selection {
+    background: rgb(46 230 197 / 0.28);
+    color: var(--color-foreground);
+  }
+}
+
+h1.tabular-nums {
+  color: var(--color-destructive);
+}
+
+.bg-card,
+.bg-popover {
+  background-color: color-mix(in oklab, var(--color-card) 34%, transparent);
+  backdrop-filter: blur(10px) saturate(1.35);
+  -webkit-backdrop-filter: blur(10px) saturate(1.35);
+  box-shadow:
+    0 0 0 1px rgb(238 242 246 / 0.2),
+    0 16px 40px rgb(0 0 0 / 0.38),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+}
+
+.bg-card:hover {
+  background-color: color-mix(in oklab, var(--color-secondary) 42%, transparent);
+}
+
+html.space-off .space-field {
+  display: none;
+}
+
+.space-field {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.space-shot {
+  position: absolute;
+  inset: -12%;
+  background: url("/space.jpg") center / cover no-repeat;
+  animation: space-drift 52s ease-in-out infinite alternate;
+  will-change: transform;
+  opacity: 0.85;
+}
+
+.supernova {
+  position: absolute;
+  width: min(78vw, 820px);
+  height: min(78vw, 820px);
+  top: 6%;
+  right: -10%;
+  background: url("/supernova.jpg") center / cover no-repeat;
+  border-radius: 50%;
+  mix-blend-mode: screen;
+  opacity: 0.58;
+  filter: saturate(1.15) brightness(0.95);
+  mask-image: radial-gradient(circle, black 46%, transparent 74%);
+  animation: spin-nova 110s linear infinite;
+  will-change: transform;
+}
+
+.space-vignette {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 18%, transparent 4%, rgb(5 6 10 / 0.42) 72%),
+    linear-gradient(180deg, rgb(5 6 10 / 0.22), rgb(5 6 10 / 0.55) 100%);
+}
+
+.text-muted-foreground {
+  color: var(--color-muted-foreground);
+  text-shadow: 0 1px 10px rgb(5 6 10 / 0.9);
+}
+
+@keyframes space-drift {
+  from {
+    transform: scale(1.04) translate3d(-1.6%, 0.4%, 0);
+  }
+  to {
+    transform: scale(1.12) translate3d(1.8%, -1.2%, 0);
+  }
+}
+
+@keyframes spin-nova {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
   }
 }
 

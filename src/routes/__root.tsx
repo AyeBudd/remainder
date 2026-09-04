@@ -17,7 +17,7 @@ export const Route = createRootRoute({
         name: "description",
         content: "Set crypto target holdings, see capital remaining, and plan a DCA path.",
       },
-      { name: "theme-color", content: "#0c0d0c" },
+      { name: "theme-color", content: "#05060a" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -38,12 +38,24 @@ export const Route = createRootRoute({
         <HeadContent />
       </head>
       <body>
-        <PreviewHostBridge />
-        <AuthProvider>
-          <IdleResume />
-          <ProductTour />
-          <Outlet />
-        </AuthProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("remaindr-space-bg")==="0")document.documentElement.classList.add("space-off")}catch(e){}`,
+          }}
+        />
+        <div className="space-field" aria-hidden>
+          <div className="space-shot" />
+          <div className="supernova" />
+          <div className="space-vignette" />
+        </div>
+        <div className="relative z-10">
+          <PreviewHostBridge />
+          <AuthProvider>
+            <IdleResume />
+            <ProductTour />
+            <Outlet />
+          </AuthProvider>
+        </div>
         <Scripts />
       </body>
     </html>
