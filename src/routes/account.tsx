@@ -309,7 +309,7 @@ function AccountPage() {
         <section className="mt-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6">
           <h2 className="font-serif text-2xl tracking-tight text-destructive">Delete account</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Permanently removes this account, holdings, wallets, DCA plans, and settings. This cannot be undone.
+            Permanently removes this account, holdings, DCA plans, and settings. This cannot be undone.
             Export first if you want a copy. See the{" "}
             <Link to="/privacy" className="text-foreground underline-offset-4 hover:underline">
               Privacy policy

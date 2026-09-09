@@ -21,7 +21,7 @@ export const TOUR_STEPS = [
   },
   {
     title: "You’re in",
-    body: "Export or import CSV, connect wallets, tweak account settings. Replay this tour anytime from your name in the top right.",
+    body: "Export or import CSV, or tweak account settings. Replay this tour anytime from your name in the top right.",
   },
 ] as const;
 

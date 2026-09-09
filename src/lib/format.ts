@@ -51,11 +51,6 @@ export function formatSignedPercent(ratio: number): string {
   return `${pct > 0 ? "+" : ""}${pct.toFixed(digits)}%`;
 }
 
-export function formatAddress(address: string): string {
-  if (address.length < 12) return address;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
 export function formatUpdated(at: number, now = Date.now()): string {
   if (!at) return "not yet";
   const sec = Math.max(0, Math.round((now - at) / 1000));

@@ -14,11 +14,6 @@ export type Holding = {
   costBasisUsd: number | null;
 };
 
-export type LinkedWallet = {
-  address: string;
-  label: string | null;
-};
-
 export type HoldingInput = Omit<Holding, "id" | "costBasisUsd"> & {
   markPrice?: number;
   costBasisUsd?: number | null;

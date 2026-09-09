@@ -352,9 +352,7 @@ type HoldingCronRow = {
 };
 
 function holdingFromCron(row: HoldingCronRow): Holding {
-  const walletAmount = num(row.wallet_amount);
   const currentAmount = num(row.current_amount);
-  const manualAmount = row.manual_amount == null ? Math.max(0, currentAmount - walletAmount) : num(row.manual_amount);
   return {
     id: String(row.id),
     symbol: row.symbol,
@@ -362,10 +360,10 @@ function holdingFromCron(row: HoldingCronRow): Holding {
     coingeckoId: row.coingecko_id,
     targetAmount: num(row.target_amount),
     currentAmount,
-    source: walletAmount > 0 && manualAmount > 0 ? "mixed" : walletAmount > 0 ? "wallet" : "manual",
-    walletAddress: row.wallet_address,
-    walletAmount,
-    manualAmount,
+    source: "manual",
+    walletAddress: null,
+    walletAmount: 0,
+    manualAmount: currentAmount,
     costBasisUsd: numOrNull(row.cost_basis_usd),
   };
 }

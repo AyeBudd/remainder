@@ -96,14 +96,13 @@ function render(){
               return `${head}<button data-sort="${s.id}">${state.sort===s.id?"✓ ":""}${esc(s.label)}</button>`;
             }).join("")}</div>` : ""}
           </div>` : ""}
-          <button class="btn btn-outline" data-act="wallet">${I.wallet} Wallet</button>
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
         </div>
       </div>
       ${noticesHtml()}
       ${state.holdings.length===0 ? `<div class="empty">
         <h3>Set the first mark</h3>
-        <p>Name an asset, a target stack, and what you already hold — wallet or typed in. Remaindr shows the capital left, then a path to fill it.</p>
+        <p>Name an asset, a target stack, and what you already hold. Remaindr shows the capital left, then a path to fill it.</p>
         <div class="actions">
           <button class="btn btn-primary" data-act="add">${I.plus} Add target</button>
           <button class="btn btn-outline" data-act="sample">Use sample stack</button>
@@ -316,7 +315,6 @@ function cardHtml(h){
         <div class="sym"><h3>${esc(h.symbol)}</h3><span>${esc(h.name)}</span></div>
         ${changeHtml(state.changes && state.changes[h.idg])}
         <div class="badges">
-          <span class="badge ${h.source==="wallet"?"badge-ok":""}">${h.source==="wallet"?"Wallet":"Manual"}</span>
           ${plan?`<span class="badge badge-out">DCA ${esc(plan.frequency)} to ${esc(plan.targetDate)}</span>`:""}
         </div>
       </div>
@@ -352,27 +350,6 @@ function dialogHtml(){
     <p class="desc">This public GitHub Pages build keeps your ledger in this browser. Google / X account save needs Remaindr hosted with a database (the full app in this repo).</p>
     <div class="actions" style="margin-top:1.25rem;justify-content:flex-end"><button class="btn btn-primary" data-close="1">Keep it local</button></div>
   </div></div>`;
-  if (d.type==="wallet") {
-    const w = state.wallet;
-    const available = Boolean(getProvider());
-    return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="w-title">
-      <button class="x" data-close="1" aria-label="Close">${I.x}</button>
-      <h2 id="w-title">Connect a wallet</h2>
-      <p class="desc">Read-only. Remaindr asks for your address and token balances on Ethereum — never a transaction, never your keys.</p>
-      ${!available?`<p class="banner" style="margin-top:1rem">No injected wallet in this browser. Holdings on a CEX, a hardware wallet, or another chain can be typed in manually.</p>`:""}
-      ${available && !w.address ? `<div style="margin-top:1rem"><button class="btn btn-primary" data-act="connect" ${w.busy?"disabled":""}>${I.wallet} ${w.busy?"Connecting…":"Connect Ethereum wallet"}</button></div>`:""}
-      ${w.address ? `<div style="margin-top:1rem">
-        <p class="held">Connected <span class="mono" style="color:var(--fg)">${esc(w.address.slice(0,6)+"…"+w.address.slice(-4))}</span></p>
-        ${w.bals.length===0?`<p class="held" style="margin-top:8px">No catalog tokens found on this address. You can still enter holdings by hand.</p>`:`
-        <ul class="bal" style="margin-top:8px">${w.bals.map(b=>{
-          const maps = state.holdings.find(h=>h.symbol===b.maps)||state.holdings.find(h=>h.symbol===b.symbol);
-          return `<li><label><input type="checkbox" data-tok="${esc(b.symbol)}" ${w.selected[b.symbol]?"checked":""}/><span style="flex:1;font-size:14px"><b>${esc(b.symbol)}</b> <span class="held">${esc(formatCoins(b.amount,b.symbol))}</span></span><span class="held">${maps?"→ "+maps.symbol+" target":"add as target"}</span></label></li>`;
-        }).join("")}</ul>
-        <div style="margin-top:12px"><button class="btn btn-primary" data-act="apply-wallet" ${w.busy?"disabled":""}>${w.busy?"Applying…":"Apply selected"}</button></div>`}
-      </div>`:""}
-      ${w.err?`<p class="err">${esc(w.err)}</p>`:""}
-    </div></div>`;
-  }
   const taken = new Set(state.holdings.map(h=>h.symbol));
   const q = (d.query||"").trim().toLowerCase();
   const matches = ASSETS.filter(a => !q || a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q) || a.id.includes(q));
@@ -380,7 +357,7 @@ function dialogHtml(){
   return `<div class="overlay"><div class="dialog" role="dialog" aria-labelledby="a-title">
     <button class="x" data-close="1" aria-label="Close">${I.x}</button>
     <h2 id="a-title">${d.edit?`Edit ${esc(d.edit.symbol)}`:"Add a target"}</h2>
-    <p class="desc">Pick from the current top 250 by market cap, or add any CoinGecko id. Current amount can be typed in or filled from a wallet later.</p>
+    <p class="desc">Pick from the current top 250 by market cap, or add any CoinGecko id. Type the amount you already hold.</p>
     ${!d.edit?`<div style="margin-top:1rem">
       <label class="lbl" for="asset-search">Top 250 assets</label>
       ${!d.custom?`<input id="asset-search" value="${esc(d.query||"")}" placeholder="Search Bitcoin, HYPE, PENGU…" autocomplete="off" />
@@ -424,15 +401,12 @@ document.getElementById("app").addEventListener("click", (e) => {
   }
   else if (t.dataset.act==="btc-refresh") { loadBtcTracker(true); }
   else if (t.dataset.act==="add") openAdd();
-  else if (t.dataset.act==="wallet") openWallet();
   else if (t.dataset.act==="sample") { Object.assign(state, makeSample()); persist(); render(); }
   else if (t.dataset.act==="prices") { loadPrices(true); }
   else if (t.dataset.act==="sort-toggle") { state.sortOpen=!state.sortOpen; state.menu=null; render(); }
   else if (t.dataset.sort) { state.sort=t.dataset.sort; saveSort(state.sort); state.sortOpen=false; render(); }
   else if (t.dataset.act==="save-plan") savePlan();
   else if (t.dataset.act==="clear-plan") clearPlan(t.dataset.id);
-  else if (t.dataset.act==="connect") connectWallet();
-  else if (t.dataset.act==="apply-wallet") applyWallet();
   else if (t.dataset.act==="save-holding") saveHolding();
   else if (t.dataset.act==="toggle-custom") { state.dialog.custom=!state.dialog.custom; render(); }
   else if (t.dataset.menu) { state.menu = state.menu===t.dataset.menu ? null : t.dataset.menu; state.sortOpen=false; render(); }
@@ -444,7 +418,6 @@ document.getElementById("app").addEventListener("click", (e) => {
 });
 document.getElementById("app").addEventListener("change", (e) => {
   if (e.target.id==="dca-asset") { state.dcaId=e.target.value; render(); }
-  if (e.target.dataset.tok) { state.wallet.selected[e.target.dataset.tok]=e.target.checked; }
 });
 document.getElementById("app").addEventListener("input", (e) => {
   const d = state.dialog;

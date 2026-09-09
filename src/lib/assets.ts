@@ -3,7 +3,6 @@ import { BAKED_TOP_100 } from "@/lib/baked-assets";
 export type EthereumToken = {
   address: `0x${string}` | "native";
   decimals: number;
-  /** When set, wallet balances of this token apply to another holding symbol. */
   mapsToSymbol?: string;
 };
 

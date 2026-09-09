@@ -4,14 +4,14 @@
 
 Set crypto target holdings, see the capital left to hit them, and plan a DCA path.
 
-Holdings can be typed in (CEX or private) or imported read-only from an Ethereum wallet. Remaindr never asks you to sign a transaction.
+Holdings are typed in by you (CEX, hardware wallet, or anywhere else). Remaindr does not connect a crypto wallet, request a signature, or store a wallet address.
 
-The public GitHub Pages site is the same ledger you see in preview — guest mode, live prices, wallet import, and DCA planning. Sign-in to save a stack across devices needs the full server app below.
+The public GitHub Pages site is the same ledger you see in preview — guest mode, live prices, and DCA planning. Sign-in to save a stack across devices needs the full server app below.
 
 ## Features
 
 - Target stacks with live USD remaining and fill progress
-- Manual current holdings, or wallet import (injected MetaMask / Rabby)
+- Manual current holdings
 - Per-asset DCA plans: date, cadence, optional assumed price, projection chart
 - What if? calculator: set your own price on every asset and see held + target value at once
 - BTC tracker: live price, days since / days to halving, ATH, cycle low

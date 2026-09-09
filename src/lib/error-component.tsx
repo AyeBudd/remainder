@@ -9,7 +9,9 @@ export function AppErrorComponent({ error }: ErrorComponentProps) {
       </span>
       <h1 className="font-serif text-2xl tracking-tight">Something went wrong</h1>
       <p className="max-w-md text-sm break-words text-muted-foreground">
-        {error.message || "An unexpected error occurred. Try reloading the page."}
+        {error instanceof Error
+          ? error.message || "An unexpected error occurred. Try reloading the page."
+          : "An unexpected error occurred. Try reloading the page."}
       </p>
     </main>
   );

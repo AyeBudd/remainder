@@ -84,7 +84,7 @@ function Login() {
         {mode === "up" ? "Create account" : "Sign in"}
       </h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        Save this stack to your account. Wallet reads stay in the browser.
+        Save this stack to your account. Amounts are typed in by you — Remaindr never connects a wallet.
       </p>
 
       {authEnabled ? (

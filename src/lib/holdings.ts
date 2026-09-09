@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql } from "@/lib/db";
 import { authMiddleware } from "@/lib/auth/middleware";
-import type { DcaFrequency, DcaPlan, Holding, HoldingInput, HoldingSource } from "./types";
+import type { DcaFrequency, DcaPlan, Holding, HoldingInput } from "./types";
 import { rollCostBasis } from "@/lib/pnl";
 
 function num(v: string | number | null | undefined): number {
@@ -35,21 +35,8 @@ type PlanRow = {
   baseline?: unknown;
 };
 
-function sourceOf(walletAmount: number, manualAmount: number): HoldingSource {
-  if (walletAmount > 0 && manualAmount > 0) return "mixed";
-  if (walletAmount > 0) return "wallet";
-  return "manual";
-}
-
 function toHolding(row: HoldingRow): Holding {
   const currentAmount = num(row.current_amount);
-  const walletAmount = num(row.wallet_amount);
-  const manualAmount =
-    row.manual_amount == null
-      ? row.source === "wallet"
-        ? 0
-        : currentAmount
-      : num(row.manual_amount);
   return {
     id: String(row.id),
     symbol: row.symbol,
@@ -57,10 +44,10 @@ function toHolding(row: HoldingRow): Holding {
     coingeckoId: row.coingecko_id,
     targetAmount: num(row.target_amount),
     currentAmount,
-    source: sourceOf(walletAmount, manualAmount),
-    walletAddress: row.wallet_address,
-    walletAmount,
-    manualAmount,
+    source: "manual",
+    walletAddress: null,
+    walletAmount: 0,
+    manualAmount: currentAmount,
     costBasisUsd: row.cost_basis_usd == null ? null : num(row.cost_basis_usd),
   };
 }
@@ -139,7 +126,7 @@ const holdingInput = z.object({
   coingeckoId: z.string().min(1).max(80),
   targetAmount: z.number().positive(),
   currentAmount: z.number().min(0),
-  source: z.enum(["manual", "wallet", "mixed"]),
+  source: z.enum(["manual", "wallet", "mixed"]).optional(),
   walletAddress: z.string().nullable().optional(),
   walletAmount: z.number().min(0).optional(),
   manualAmount: z.number().min(0).optional(),
@@ -204,9 +191,6 @@ export const createHolding = createServerFn({ method: "POST" })
   .validator((input: unknown) => holdingInput.parse(input))
   .handler(async ({ context, data }) => {
     const sql = await getSql();
-    const walletAmount = data.walletAmount ?? (data.source === "wallet" || data.source === "mixed" ? data.currentAmount : 0);
-    const manualAmount = data.manualAmount ?? Math.max(0, data.currentAmount - walletAmount);
-    const source = sourceOf(walletAmount, manualAmount);
     const costBasisUsd =
       data.costBasisUsd ??
       (data.markPrice && data.markPrice > 0 ? data.currentAmount * data.markPrice : null);
@@ -219,10 +203,10 @@ export const createHolding = createServerFn({ method: "POST" })
         ${data.coingeckoId},
         ${data.targetAmount},
         ${data.currentAmount},
-        ${source},
-        ${data.walletAddress ?? null},
-        ${walletAmount},
-        ${manualAmount},
+        ${"manual"},
+        ${null},
+        ${0},
+        ${data.currentAmount},
         ${costBasisUsd}
       )
       returning id, symbol, name, coingecko_id, target_amount, current_amount, source, wallet_address, wallet_amount, manual_amount, cost_basis_usd
@@ -247,19 +231,8 @@ export const updateHolding = createServerFn({ method: "POST" })
     if (!row) throw new Error("Holding not found");
     const prev = toHolding(row);
     const targetAmount = data.targetAmount ?? prev.targetAmount;
-    const walletAmount = data.walletAmount ?? prev.walletAmount;
-    let currentAmount = data.currentAmount ?? prev.currentAmount;
-    let manualAmount = data.manualAmount ?? prev.manualAmount;
-    if (data.walletAmount != null && data.manualAmount == null && data.currentAmount == null) {
-      currentAmount = walletAmount + manualAmount;
-    } else if (data.currentAmount != null && data.manualAmount == null) {
-      manualAmount = Math.max(0, currentAmount - walletAmount);
-    } else {
-      currentAmount = walletAmount + manualAmount;
-    }
-    const source = sourceOf(walletAmount, manualAmount);
-    const walletAddress =
-      data.walletAddress === undefined ? row.wallet_address : data.walletAddress;
+    const currentAmount = data.currentAmount ?? prev.currentAmount;
+    const source = "manual";
     let costBasisUsd = data.costBasisUsd !== undefined ? data.costBasisUsd : prev.costBasisUsd;
     if (data.costBasisUsd === undefined && data.markPrice && data.markPrice > 0) {
       costBasisUsd = rollCostBasis(prev.currentAmount, costBasisUsd, currentAmount, data.markPrice);
@@ -269,9 +242,9 @@ export const updateHolding = createServerFn({ method: "POST" })
       set target_amount = ${targetAmount},
           current_amount = ${currentAmount},
           source = ${source},
-          wallet_address = ${walletAddress},
-          wallet_amount = ${walletAmount},
-          manual_amount = ${manualAmount},
+          wallet_address = ${null},
+          wallet_amount = ${0},
+          manual_amount = ${currentAmount},
           cost_basis_usd = ${costBasisUsd},
           updated_at = now()
       where id = ${id} and user_id = ${context.userId}

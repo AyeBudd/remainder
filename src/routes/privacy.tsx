@@ -3,9 +3,9 @@ import { LegalDoc } from "@/components/legal-doc";
 
 export const Route = createFileRoute("/privacy")({ component: PrivacyPage });
 
-function PrivacyPage() {
+export function PrivacyPage() {
   return (
-    <LegalDoc title="Privacy policy" updated="23 August 2026">
+    <LegalDoc title="Privacy policy" updated="9 September 2026">
       <p>
         This policy describes how Remaindr (remaindr.xyz) handles information when you use the
         ledger, sign in, or opt into email. It is written for this product as it exists today. We
@@ -20,8 +20,8 @@ function PrivacyPage() {
       </p>
       <p>
         <strong className="text-foreground">Ledger.</strong> Holdings you add (symbol, amounts,
-        targets, cost basis, source), DCA plans, and Ethereum addresses you choose to link. We store
-        these on the server only when you are signed in.
+        targets, cost basis), and DCA plans. We store these on the server only when you are signed
+        in. Remaindr does not connect crypto wallets or store wallet addresses.
       </p>
       <p>
         <strong className="text-foreground">Preferences.</strong> Newsletter and DCA-alert toggles,
@@ -41,7 +41,7 @@ function PrivacyPage() {
 
       <h2>What we do not collect</h2>
       <ul>
-        <li>Seed phrases, private keys, or exchange passwords.</li>
+        <li>Seed phrases, private keys, wallet connections, or exchange passwords.</li>
         <li>Payment cards (Remaindr does not take payment on these pages today).</li>
         <li>Precise location. Any location inferred from IP is a side effect of hosting, not a feature.</li>
       </ul>
@@ -67,10 +67,6 @@ function PrivacyPage() {
           Market-data sources (including CoinGecko and other public APIs) — we request prices and
           market stats; we do not send them your holdings.
         </li>
-        <li>
-          Public blockchain RPCs — if you add a wallet address, that address is queried for balances.
-          Addresses you add are already public on-chain.
-        </li>
       </ul>
       <p>We do not sell personal information or share it for cross-context advertising.</p>
 
@@ -84,7 +80,7 @@ function PrivacyPage() {
       <h2>Retention</h2>
       <p>
         Server data is kept while your account exists. Delete account in{" "}
-        <Link to="/account">Account settings</Link> removes your user record, holdings, wallets, DCA
+        <Link to="/account">Account settings</Link> removes your user record, holdings, DCA
         plans, and settings from our database. Backups and logs may lag for a short period. Emails
         already sent are not unsent. Guest data lasts until you clear this browser.
       </p>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpDown, Check, Download, Plus, RefreshCw, Search, Upload, Wallet } from "lucide-react";
+import { ArrowUpDown, Check, Download, Plus, RefreshCw, Search, Upload } from "lucide-react";
 import { remainingCoins } from "@/lib/assets";
 import { downloadLedgerCsv } from "@/lib/export-ledger";
 import { formatCoins, formatPercent, formatSignedPercent, formatSignedUsd, formatUpdated, formatUsd } from "@/lib/format";
@@ -28,7 +28,6 @@ import { DcaNotices } from "@/components/dca-notices";
 import { DcaPanel } from "@/components/dca-panel";
 import { HoldingCard } from "@/components/holding-card";
 import { Onboarding } from "@/components/onboarding";
-import { WalletDialog } from "@/components/wallet-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -46,7 +45,6 @@ export function Dashboard() {
   const { prices, changes, status: priceStatus, assets, updatedAt, refreshing, refresh } = usePrices();
   const { hidden: hideAmounts } = useHideAmounts();
   const [addOpen, setAddOpen] = useState(false);
-  const [walletOpen, setWalletOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<Holding | null>(null);
   const [buying, setBuying] = useState<Holding | null>(null);
@@ -165,22 +163,6 @@ export function Dashboard() {
     const payload = markPrice != null ? { ...input, markPrice } : input;
     const saved = id ? await portfolio.update(id, payload) : await portfolio.add(payload);
     await snapshot(saved);
-  };
-
-  const applyWallet = async (
-    updates: { id: string; walletAmount: number; walletAddress: string }[],
-  ) => {
-    for (const u of updates) {
-      const holding = holdings.find((h) => h.id === u.id);
-      const markPrice = holding ? prices[holding.coingeckoId] : undefined;
-      const updated = await portfolio.update(u.id, {
-        walletAmount: u.walletAmount,
-        walletAddress: u.walletAddress,
-        source: u.walletAmount > 0 ? "wallet" : "manual",
-        markPrice,
-      });
-      await snapshot(updated);
-    }
   };
 
   const createFromOnboarding = async (input: HoldingInput, plan: DcaPlanInput | null) => {
@@ -319,7 +301,7 @@ export function Dashboard() {
         {momentLine && <p className="mt-4 text-sm text-muted-foreground">{momentLine}</p>}
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
           P/L uses the cost basis you type on Edit amounts. If you leave it blank, new coins are marked at the live
-          price when you save or refresh a wallet. CEX fills are not imported.
+          price when you save. CEX fills are not imported.
         </p>
         {totals.slices.length > 0 && (
           <div className="mt-5">
@@ -425,10 +407,6 @@ export function Dashboard() {
             >
               <Upload />
               Import CSV
-            </Button>
-            <Button variant="outline" onClick={() => setWalletOpen(true)}>
-              <Wallet />
-              {portfolio.wallets.length > 1 ? `Wallets (${portfolio.wallets.length})` : "Wallets"}
             </Button>
             <Button onClick={() => setAddOpen(true)}>
               <Plus />
@@ -574,19 +552,6 @@ export function Dashboard() {
           return saved;
         }}
       />
-      <WalletDialog
-        open={walletOpen}
-        onOpenChange={setWalletOpen}
-        holdings={holdings}
-        wallets={portfolio.wallets}
-        onAddWallet={(address) => portfolio.addWallet(address).then(() => undefined)}
-        onRemoveWallet={(address) => portfolio.removeWallet(address).then(() => undefined)}
-        onApply={applyWallet}
-        onAddFromWallet={async (input) => {
-          const created = await portfolio.add({ ...input, markPrice: prices[input.coingeckoId] });
-          await snapshot(created);
-        }}
-      />
     </>
   );
 }
@@ -630,7 +595,7 @@ function EmptyState({
     <div className="mt-4 rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
       <h3 className="font-serif text-3xl tracking-tight">Set the first mark</h3>
       <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-        Name an asset, a target stack, and what you already hold — wallet or typed in.
+        Name an asset, a target stack, and what you already hold.
         Remaindr shows the capital left, then a path to fill it.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">

@@ -5,7 +5,7 @@ export const Route = createFileRoute("/terms")({ component: TermsPage });
 
 function TermsPage() {
   return (
-    <LegalDoc title="Terms of use" updated="23 August 2026">
+    <LegalDoc title="Terms of use" updated="9 September 2026">
       <p>
         These terms govern your use of Remaindr at remaindr.xyz (the “service”). By using the
         service or creating an account, you agree to them. If you do not agree, do not use Remaindr.
@@ -43,12 +43,11 @@ function TermsPage() {
         browser’s storage.
       </p>
 
-      <h2>Your data and wallets</h2>
+      <h2>Your data</h2>
       <p>
-        Holdings, targets, cost basis, DCA plans, and optional wallet addresses are information you
-        provide. Public blockchain balances for addresses you add are read through public RPC
-        endpoints in order to fill amounts. Remaindr never asks for a seed phrase, private key, or
-        the ability to move funds. Do not paste secrets into the service.
+        Holdings, targets, cost basis, and DCA plans are information you type in. Remaindr does not
+        connect a crypto wallet, request a signature, or store a wallet address. Do not paste seed
+        phrases, private keys, or other secrets into the service.
       </p>
 
       <h2>Market data</h2>

@@ -1,20 +1,9 @@
 let ASSETS = BAKED.slice();
 
-
-const TOKENS = [
-  { symbol:"ETH", name:"Ethereum", maps:"ETH", address:"native", decimals:18 },
-  { symbol:"WBTC", name:"Wrapped Bitcoin", maps:"BTC", address:"0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599", decimals:8 },
-  { symbol:"WETH", name:"Wrapped Ether", maps:"ETH", address:"0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2", decimals:18 },
-  { symbol:"USDC", name:"USD Coin", maps:"USDC", address:"0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48", decimals:6 },
-  { symbol:"USDT", name:"Tether", maps:"USDT", address:"0xdAC17F958D2ee523a2206206994597C13D831ec7", decimals:6 },
-  { symbol:"LINK", name:"Chainlink", maps:"LINK", address:"0x514910771AF9Ca656af840dff83E8264EcF986CA", decimals:18 },
-  { symbol:"UNI", name:"Uniswap", maps:"UNI", address:"0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984", decimals:18 },
-];
 const KEY = "remainder.v1";
 const FREQS = [["daily","Daily"],["weekly","Weekly"],["biweekly","Biweekly"],["monthly","Monthly"]];
 const I = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5v14"/></svg>',
-  wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1"/><path d="M3 9h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="16" cy="13" r="1"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>',
   route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg>',
   refresh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>',
@@ -299,7 +288,6 @@ const state = {
   dialog: null,
   dcaId: null,
   form: {},
-  wallet: { address:null, bals:[], selected:{}, busy:false, err:null },
 };
 
 function persist(){ save({ holdings: state.holdings, plans: state.plans }); }
@@ -491,11 +479,6 @@ function openAdd(edit){
   state.dialog = { type:"add", edit: edit||null, query:"", asset: edit?ASSETS.find(a=>a.symbol===edit.symbol):null, custom:false, csym:"", cid:"", target: edit?String(edit.target):"", current: edit?String(edit.current):"", err:null, busy:false };
   render();
 }
-function openWallet(){
-  state.wallet = { address:null, bals:[], selected:{}, busy:false, err:null };
-  state.dialog = { type:"wallet" };
-  render();
-}
 function openSignIn(){
   state.dialog = { type:"signin" };
   render();
@@ -609,63 +592,6 @@ function syncForm(){
   const h = currentDca();
   const ex = h && state.plans.find(p=>p.holdingId===h.id);
   state.form = { date: ex?.targetDate || sampleDate(), freq: ex?.frequency || "weekly", assumed: ex?.assumed!=null ? String(ex.assumed) : "", err:null };
-}
-
-function getProvider(){
-  const eth = window.ethereum;
-  if (!eth) return null;
-  if (Array.isArray(eth.providers) && eth.providers[0]) return eth.providers[0];
-  return eth;
-}
-async function connectWallet(){
-  const p = getProvider();
-  const w = state.wallet;
-  if (!p) { w.err="No browser wallet found. Use manual holdings, or open this in a browser with MetaMask or Rabby."; render(); return; }
-  w.busy=true; w.err=null; render();
-  try {
-    const acc = await p.request({ method:"eth_requestAccounts" });
-    const address = acc[0];
-    if (!address) throw new Error("Wallet did not return an account.");
-    try {
-      const chain = await p.request({ method:"eth_chainId" });
-      if (String(chain).toLowerCase() !== "0x1") await p.request({ method:"wallet_switchEthereumChain", params:[{chainId:"0x1"}] });
-    } catch {}
-    const bals = [];
-    for (const tok of TOKENS) {
-      try {
-        let hex;
-        if (tok.address==="native") hex = await p.request({ method:"eth_getBalance", params:[address,"latest"] });
-        else {
-          const data = "0x70a08231" + address.replace(/^0x/i,"").toLowerCase().padStart(64,"0");
-          hex = await p.request({ method:"eth_call", params:[{to:tok.address, data},"latest"] });
-        }
-        const raw = BigInt(hex || "0x0");
-        const base = 10n ** BigInt(tok.decimals);
-        const amt = Number(raw)/Number(base);
-        if (amt>0) bals.push({ ...tok, amount:amt });
-      } catch {}
-    }
-    w.address = address; w.bals = bals;
-    const selected = {};
-    for (const b of bals) if (state.holdings.some(h=>h.symbol===b.maps || h.symbol===b.symbol)) selected[b.symbol]=true;
-    w.selected = selected;
-  } catch (e) { w.err = e.message || "Could not connect wallet"; }
-  w.busy=false; render();
-}
-function applyWallet(){
-  const w = state.wallet;
-  if (!w.address) return;
-  for (const b of w.bals) {
-    if (!w.selected[b.symbol]) continue;
-    const match = state.holdings.find(h=>h.symbol===b.maps) || state.holdings.find(h=>h.symbol===b.symbol);
-    if (match) { match.current = b.amount; match.source="wallet"; match.wallet=w.address; }
-    else {
-      const a = ASSETS.find(x=>x.symbol===b.maps) || ASSETS.find(x=>x.symbol===b.symbol);
-      if (!a) continue;
-      state.holdings.push({ id:uid(), symbol:a.symbol, name:a.name, idg:a.id, target:b.amount, current:b.amount, source:"wallet", wallet:w.address });
-    }
-  }
-  persist(); closeDialog();
 }
 
 function chartSvg(series, symbol, milestones){
